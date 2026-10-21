@@ -32,10 +32,12 @@ td,th{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);v
 <tr><td>Password</td><td>Never stored. Your browser scrambles it (PBKDF2, 150,000 rounds) and the server stores only a salted hash of that, which can't be turned back into your password</td></tr>
 <tr><td>Quiz activity: which questions you answered, right or wrong, topic, mock scores, Calc Lab attempts</td><td>To back up your progress across devices, run the leaderboard, and show the organiser which topics the class finds hard</td></tr>
 <tr><td>Saved progress (mistakes list, must-know ticks, mock history)</td><td>To restore your progress when you log in on another device</td></tr>
+<tr><td>Payment screenshot and transaction ID (only if you upload one to unlock the course exams)</td><td>So the organiser can check your payment and unlock your account. The screenshot is kept in the organiser's private Google Drive and is never shown to other students</td></tr>
+<tr><td>Certificates you claim (name, score, exam, date)</td><td>So anyone you share the certificate link with can check it's genuine</td></tr>
 </table>
 
 <h2>Where it's stored</h2>
-<p>In a private Google Sheet owned by the class organiser, accessed through Google Apps Script. Only the organiser can open it. Nothing is sold, shared with third parties or used for advertising. The app has no trackers or analytics.</p>
+<p>In a private Google Sheet (and, for payment screenshots, a private Google Drive folder) owned by the class organiser, accessed through Google Apps Script. Only the organiser can open it. Nothing is sold, shared with third parties or used for advertising. The app has no trackers or analytics.</p>
 
 <h2>Who can see what</h2>
 <ul>

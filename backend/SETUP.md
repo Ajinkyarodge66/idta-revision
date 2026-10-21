@@ -35,6 +35,8 @@ Lessons, Practice, Calc Lab and flashcards are free for everyone, and verified u
 - Each code has a **value per use** (e.g. £3, or 0 for a free promo code). To unlock one student directly, use **Paid £3** or **Free** in **Admin → Overview → Students**.
 - The **Sales** panel at the top of Exam & coupons totals what you recorded: revenue, this month, paid vs free unlocks, conversion and a 30-day chart. It only counts what you record, so check it against your bank or payment app.
 
+**Payment screenshots.** On the lock screen, a student can upload a screenshot of their payment (with an optional transaction ID). You get an email, and it appears at the top of **Admin → Exam & coupons → Payments to check** (the tab shows a red count, refreshed every 30 seconds). Click **View screenshot**, then **Approve & unlock** (records the sale) or **Reject** with a reason. The student's page unlocks by itself within about 20 seconds, and they get an email either way. Screenshots are saved in a private Drive folder, *IDTA Revision payment screenshots (private)*; the `setup` log prints its link. Emails go to your Google account; to use another address, add a script property `NOTIFY_EMAIL`.
+
 Codes and who used them are stored in the **Coupons** sheet. The lock is on by default once this version of `Code.gs` is deployed.
 
 ## Updating the script (keeps the same URL)
@@ -55,6 +57,7 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 | **Announcements** | Banners you post from the admin page (title, message, style, expiry) |
 | **Questions** | Questions you add from the admin page (IDs from 1000 up) |
 | **Coupons** | Exam coupon codes: code, max uses, times used, expiry, your note, which accounts used it, and value per use |
+| **Payments** | Uploaded payment screenshots: ID, time, student, mobile, amount, reference, Drive file ID, status (pending/approved/rejected), decision time and reason |
 | **Certificates** | Certificates students claimed: ID, date, user, name, score and exam. Anyone can check one at `…/#cert=ID` |
 
 Hidden built-in questions are saved in the `HIDDEN_Q` script property.

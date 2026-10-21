@@ -17,7 +17,8 @@ const SHEETS = {
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
   questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] },
   coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by', 'Value per use'] },
-  certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] }
+  certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] },
+  payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] }
 };
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
 const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20 };
@@ -523,6 +524,66 @@ const API = {
     const m = me_(b); if (!m) return fail_('auth');
     return { ok: true, certs: sheet_('certs').getDataRange().getValues().slice(1).filter(r => String(r[2]) === m.uid).map(certOut_).reverse() };
   },
+  /* ----- payment screenshots: student uploads proof, admin approves ----- */
+  paySubmit: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    if (m.r[U.exam]) return fail_('already_unlocked');
+    const mt = String(b.mime || ''), data = String(b.image || '');
+    if (!/^image\/(jpeg|png|webp)$/.test(mt) || data.length < 200 || data.length > 2800000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail_('bad_image');
+    return withLock_(() => {
+      const key = 'pay:' + m.uid;
+      if (tooMany_(key, 6)) return fail_('too_many_attempts');
+      const sh = sheet_('payments'), v = sh.getDataRange().getValues();
+      for (let i = 1; i < v.length; i++) if (String(v[i][2]) === m.uid && v[i][8] === 'pending') return fail_('pay_pending');
+      bump_(key, 86400);
+      const id = 'P' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
+      const file = proofFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(data), mt, id + '-' + String(m.r[U.name]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 30) + (mt === 'image/png' ? '.png' : mt === 'image/webp' ? '.webp' : '.jpg')));
+      const amount = money_(String(examCfg_().price).replace(/[^0-9.]/g, '')) || 0;
+      sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), amount, text_(b.ref, 60), file.getId(), 'pending', '', '']);
+      try {
+        const to = props_().getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail();
+        if (to) MailApp.sendEmail({ to: to, subject: APP + ': payment to check from ' + m.r[U.name],
+          body: m.r[U.name] + ' (+' + m.r[U.mobile] + ') uploaded a payment screenshot' + (b.ref ? ' (reference: ' + plain_(b.ref, 60) + ')' : '') + '.\n\nOpen your app, go to Admin -> Exam & coupons, and approve or reject it.' });
+      } catch (e) {}
+      return { ok: true, payment: { id: id, status: 'pending', submitted: now_() } };
+    });
+  },
+  payStatus: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const v = sheet_('payments').getDataRange().getValues();
+    let last = null;
+    for (let i = 1; i < v.length; i++) if (String(v[i][2]) === m.uid) last = v[i];
+    return { ok: true, profile: profile_(m.r), payment: last ? { id: String(last[0]), submitted: String(last[1]), status: String(last[8]), note: String(last[10] || '').replace(/^'/, '') } : null };
+  },
+  adminPayments: b => admin_(b, () => {
+    const v = sheet_('payments').getDataRange().getValues().slice(1).filter(r => r[0]);
+    const list = v.map(r => ({ id: String(r[0]), submitted: String(r[1]), uid: String(r[2]), name: String(r[3]).replace(/^'/, ''), mobile: String(r[4]).replace(/^'/, ''), amount: Number(r[5]) || 0,
+      ref: String(r[6] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, '') })).reverse();
+    return { ok: true, pending: list.filter(p => p.status === 'pending'), recent: list.filter(p => p.status !== 'pending').slice(0, 30) };
+  }),
+  adminPaymentImage: b => admin_(b, () => {
+    const v = sheet_('payments').getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_payment');
+    try { const blob = DriveApp.getFileById(String(v[i][7])).getBlob(); return { ok: true, mime: blob.getContentType(), image: Utilities.base64Encode(blob.getBytes()) }; }
+    catch (e) { return fail_('no_image'); }
+  }),
+  adminDecidePayment: b => admin_(b, () => {
+    const sh = sheet_('payments'), v = sh.getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_payment');
+    if (v[i][8] !== 'pending') return fail_('already_decided');
+    const ok = !!b.approve, note = text_(b.note, 120), amount = b.amount != null ? money_(b.amount) : Number(v[i][5]) || 0;
+    sh.getRange(i + 1, 9, 1, 3).setValues([[ok ? 'approved' : 'rejected', now_(), note]]);
+    const all = usersAll_(), u = rowOf_(all.v, U.id, String(v[i][2]));
+    if (u > 0) {
+      const r = all.v[u];
+      if (ok && !r[U.exam]) { setCell_(all.sh, u, U.exam, 'payment ' + v[i][0] + ' · ' + now_()); sale_(String(r[U.id]), r[U.name], amount, 'payment ' + v[i][0] + (v[i][6] ? ' · ' + String(v[i][6]).replace(/^'/, '') : '')); }
+      try {
+        MailApp.sendEmail({ to: String(r[U.email]), subject: APP + (ok ? ': your course exams are unlocked' : ': we could not confirm your payment'),
+          body: 'Hi ' + r[U.name] + ',\n\n' + (ok ? 'Your payment is confirmed and the course exams are unlocked. Open the app and go to the Mock exam tab. Good luck!' : 'We could not confirm your payment' + (note ? ': ' + plain_(note, 120) : '') + '.\n\nOpen the Mock exam tab to upload a clearer screenshot, or contact the organiser.') });
+      } catch (e) {}
+    }
+    return { ok: true };
+  }),
 
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
@@ -562,6 +623,13 @@ function examCfg_() {
 function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
 function sale_(uid, name, amount, how) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, '', text_(how, 60)]); }
 function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, '') }; }
+function proofFolder_() {
+  const p = props_(), id = p.getProperty('PROOF_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const f = DriveApp.createFolder('IDTA Revision payment screenshots (private)');
+  p.setProperty('PROOF_FOLDER', f.getId());
+  return f;
+}
 function couponCode_(v) { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); return s.length >= 4 && s.length <= 24 ? s : ''; }
 function couponsList_() {
   return sheet_('coupons').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
@@ -651,12 +719,13 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();
   Logger.log('Data sheet ready: ' + book_().getUrl());
   Logger.log('Emails left today (for reset codes): ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Payment screenshots folder: ' + proofFolder_().getUrl());
   Logger.log(props_().getProperty('ADMIN_KEY') ? 'ADMIN_KEY is set.' : 'ADMIN_KEY is NOT set: run setAdminKey first.');
 }
 

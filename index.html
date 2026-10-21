@@ -355,6 +355,26 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
   .badge-tile.got .bt-ic{animation:pop .5s ease both}
   @keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
 }
+/* ---- payment upload ---- */
+.pay-box{border-top:1px solid var(--line);padding-top:.9rem;margin-top:.9rem}
+.file-drop{display:flex;align-items:center;gap:.6rem;border:2px dashed var(--line);border-radius:10px;padding:.9rem 1rem;cursor:pointer;font-weight:600}
+.file-drop:hover,.file-drop:focus-within{border-color:var(--accent);background:var(--accent-soft)}
+.file-drop input{position:absolute;opacity:0;width:1px;height:1px}
+.fd-ic{font-size:1.4rem}
+.pay-prev{display:block;max-width:100%;max-height:16rem;margin-top:.7rem;border-radius:8px;border:1px solid var(--line)}
+.pay-wait{display:flex;gap:.8rem;align-items:flex-start;background:var(--accent-soft);border-radius:10px;padding:.85rem 1rem}
+.pay-wait b{display:block}.pay-wait span{color:var(--muted);font-size:.92rem}
+.pay-spin{flex:none;width:20px;height:20px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin-top:.15rem}
+@media (prefers-reduced-motion:no-preference){.pay-spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}}
+.pay-item{display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:.8rem .9rem;margin-bottom:.7rem}
+.pay-main{min-width:0;flex:1 1 16rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-start}
+.pay-main>span{color:var(--muted);font-size:.9rem}
+.pay-img img{display:block;max-width:100%;max-height:26rem;border-radius:8px;border:1px solid var(--line);margin-top:.3rem}
+.pay-act{display:flex;flex-direction:column;gap:.45rem;flex:0 1 15rem;min-width:12rem}
+.pay-act .amt{display:flex;align-items:center;gap:.3rem;font-weight:700}.pay-act .amt input{width:5.5rem}
+.pay-act input{font:inherit;padding:.35rem .5rem;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+.tab-dot{display:inline-block;min-width:1.2rem;padding:0 .3rem;border-radius:99px;background:var(--bad);color:#fff;font-size:.72rem;font-weight:700;text-align:center;margin-left:.2rem}
+.pay-recent{margin-top:.6rem}.pay-recent summary{cursor:pointer;color:var(--muted)}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -1044,9 +1064,44 @@ function examLockHTML(c){
   const how=String(c.how||"").trim();
   return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exams · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the random exam, Papers 1–3, topic tests and quick mocks, with unlimited attempts and certificates. Lessons, Practice, Calc Lab and flashcards stay free.</p></div></div>
   <form id="f-unlock" class="unlock-form" novalidate><label for="ex-code">Have a code?</label><div class="unlock-row"><input id="ex-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="e.g. IDTA-7F3K2A"><button class="btn primary" type="submit">Unlock</button></div><div id="ex-msg" role="status"></div></form>
-  <div class="unlock-how"><b>How to get a code</b>${how?`<p style="white-space:pre-line;margin:.3rem 0 0">${esc(how)}</p>`:`<p style="margin:.3rem 0 0">Ask the organiser of your study group for a code.</p>`}</div></div>`;
+  <div class="unlock-how"><b>How to pay</b>${how?`<p style="white-space:pre-line;margin:.3rem 0 0">${esc(how)}</p>`:`<p style="margin:.3rem 0 0">Ask the organiser of your study group how to pay.</p>`}</div>
+  <div class="pay-box" id="pay-box"><p class="hint">Checking your payment…</p></div></div>`;
+}
+let PAYPOLL=null;
+const payFormHTML=last=>`${last&&last.status==="rejected"?`<div class="feedback no" style="margin-top:0"><b>Your last screenshot wasn't accepted</b>${esc(last.note||"Please upload a clearer screenshot that shows the amount, date and transaction ID.")}</div>`:""}
+  <b>Paid? Upload your payment screenshot</b><p class="hint" style="margin:.2rem 0 .7rem">Take a screenshot of the successful payment in your UPI or bank app. The organiser checks it, usually within minutes, and the exams unlock here automatically.</p>
+  <form id="f-pay" novalidate><label class="file-drop" for="pay-file"><input type="file" id="pay-file" accept="image/png,image/jpeg,image/webp"><span class="fd-ic" aria-hidden="true">📷</span><span id="pay-fname">Choose screenshot</span></label>
+  <img id="pay-prev" class="pay-prev" alt="Preview of your payment screenshot" hidden>
+  <div class="field" style="margin-top:.7rem"><label for="pay-ref">Transaction ID / UTR (optional)</label><input id="pay-ref" maxlength="60" autocomplete="off" placeholder="e.g. 4123 5678 9012"></div>
+  <div id="pay-msg" role="status"></div><button class="btn primary" type="submit">Send for approval</button></form>`;
+const payPendingHTML=pm=>`<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Screenshot received. Waiting for approval.</b><span>Sent ${ago(new Date(pm.submitted).getTime())}. The organiser usually checks within minutes. Keep this page open, or come back later; it unlocks automatically.</span></div></div>`;
+function shrinkImage(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);const d=c.toDataURL("image/jpeg",.8);res({mime:"image/jpeg",data:d.split(",")[1],preview:d})};img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("bad"))};img.src=url})}
+async function payBoxRender(){
+  const box=$("#pay-box");if(!box||!signedIn())return;
+  clearInterval(PAYPOLL);
+  const r=await api("payStatus",{token:AUTH.token()},{retries:1});
+  if(!$("#pay-box"))return;
+  if(!r.ok){box.innerHTML=r.error==="unknown_action"?"":payFormHTML(null);if(r.error!=="unknown_action")bindPayForm();return}
+  if(r.profile&&r.profile.examAccess){AUTH.set({...AUTH.get(),profile:r.profile});toast("Payment approved. The exams are unlocked!");MK.mode="course";MK.chosen=true;return mockRender()}
+  if(r.payment&&r.payment.status==="pending"){box.innerHTML=payPendingHTML(r.payment);PAYPOLL=setInterval(()=>{if($("#view-mock").hidden||!$("#pay-box")){clearInterval(PAYPOLL);return}payBoxRender()},20000);return}
+  box.innerHTML=payFormHTML(r.payment);bindPayForm();
+}
+function bindPayForm(){
+  const f=$("#f-pay");if(!f)return;let picked=null;
+  const msg=(ok,t)=>$("#pay-msg").innerHTML=`<div class="feedback ${ok?"ok":"no"}">${esc(t)}</div>`;
+  $("#pay-file").onchange=async e=>{const file=e.target.files[0];picked=null;$("#pay-msg").innerHTML="";if(!file)return;
+    if(!/^image\//.test(file.type))return msg(false,"Choose an image file (a screenshot).");
+    try{picked=await shrinkImage(file);$("#pay-fname").textContent=file.name;const pv=$("#pay-prev");pv.src=picked.preview;pv.hidden=false}catch(err){msg(false,"That image couldn't be opened. Try another screenshot.")}};
+  f.onsubmit=async e=>{e.preventDefault();if(!picked)return msg(false,"Choose your payment screenshot first.");
+    await busy(f.querySelector("button[type=submit]"),"Uploading…",async()=>{
+      const r=await api("paySubmit",{token:AUTH.token(),mime:picked.mime,image:picked.data,ref:$("#pay-ref").value.trim()});
+      if(!r.ok)return msg(false,errMsg(r.error));
+      toast("Screenshot sent for approval.");payBoxRender();
+    });
+  };
 }
 function bindExamLock(){
+  payBoxRender();
   const f=$("#f-unlock");if(!f)return;
   f.onsubmit=async e=>{e.preventDefault();const code=$("#ex-code").value.trim();const m=(ok,t)=>$("#ex-msg").innerHTML=`<div class="feedback ${ok?"ok":"no"}">${esc(t)}</div>`;
     if(code.length<4)return m(false,"Enter the code you were given.");
@@ -1059,6 +1114,7 @@ function bindExamLock(){
 }
 function mockRender(){
   const root=$("#mock-root");
+  clearInterval(PAYPOLL);
   clearInterval(MK.timer);
   const N=MK.items.length||MK.n;
   if(MK.state==="intro"){
@@ -1411,6 +1467,12 @@ const ERR = {
   progress_too_big:"Your progress is too large to back up. Contact the organiser.",
   bad_coupon:"That code isn't valid. Check it and try again.",
   not_eligible:"Certificates are for full 30-question course exams passed with 70% or more.",
+  bad_image:"That image couldn't be uploaded. Choose a PNG or JPG screenshot under 2 MB.",
+  pay_pending:"You already have a screenshot waiting for approval.",
+  already_unlocked:"Your exams are already unlocked. Refresh the page.",
+  no_payment:"That payment no longer exists. Refresh the page.",
+  already_decided:"That payment was already approved or rejected. Refresh the page.",
+  no_image:"The screenshot file couldn't be found in Google Drive.",
   no_cert:"Certificate not found.",
   coupon_expired:"That code has expired. Ask for a new one.",
   coupon_used_up:"That code has already been used the maximum number of times.",
@@ -1807,6 +1869,7 @@ async function adminRender() {
   const tabs = [["overview","Overview"],["exam","Exam & coupons"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
   root.innerHTML = `<div class="filters" role="tablist" aria-label="Admin sections" style="margin-bottom:1rem">${tabs.map(([k, l]) => `<button aria-pressed="${AD.tab === k}" data-t="${k}">${l}</button>`).join("")}<button id="ad-out" style="margin-left:auto">Sign out of admin</button></div><div id="ad-body"><p class="hint">Loading…</p></div>`;
   root.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { AD.tab = b.dataset.t; adminRender(); });
+  if (AD.tab !== "exam") api("adminPayments", { key }, { retries:0 }).then(pm => { if (pm.ok) { payTabBadge(pm.pending.length); AD.payIds = pm.pending.map(p => p.id).join(); } });
   $("#ad-out").onclick = () => { store.set("idta-admin-key", ""); AD.data = null; syncTabs(); show("learn"); };
   if (AD.tab === "news") return adminNews();
   if (AD.tab === "questions") return adminQuestions();
@@ -1887,14 +1950,55 @@ function salesHTML(sl) {
   <h3 style="margin:1rem 0 .3rem">Recent unlocks</h3>${sales.length ? `<div class="tbl"><table><tr><th>When</th><th>Student</th><th>How</th><th>Amount</th></tr>${sales.slice(-30).reverse().map(x => `<tr><td>${ago(x.ts)}</td><td>${esc(x.name)}</td><td>${esc(x.how)}</td><td class="num">${x.amount ? money(x.amount) : "free"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No unlocks yet. When a student redeems a code or you press Paid/Free in Overview, it appears here.</p>`}
   <p class="hint">Amounts are what you recorded (the code's value, or Paid in Overview). Check them against your bank or payment app.</p></div>`;
 }
+function payQueueHTML(pm) {
+  const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
+  return `<div class="card pay-q" style="margin-bottom:1rem"><h2>Payments to check ${pm.pending.length ? `<span class="badge warn">${pm.pending.length} waiting</span>` : ""}</h2>
+  ${pm.pending.length ? pm.pending.map(p => `<div class="pay-item" data-pid="${esc(p.id)}"><div class="pay-main"><b>${esc(p.name)}</b><span>${esc(p.mobile)} · ${when(p.submitted)}${p.ref ? ` · ref <code>${esc(p.ref)}</code>` : ""}</span>
+    <button class="btn small" data-pview="${esc(p.id)}">View screenshot</button><div class="pay-img" id="img-${esc(p.id)}"></div></div>
+    <div class="pay-act"><label class="sr-only" for="amt-${esc(p.id)}">Amount</label><span class="amt">£<input id="amt-${esc(p.id)}" type="number" min="0" step="0.5" value="${p.amount}"></span><button class="btn primary small" data-appr="${esc(p.id)}">Approve &amp; unlock</button>
+    <input id="why-${esc(p.id)}" class="why" maxlength="120" placeholder="Reason if rejecting (optional)"><button class="btn small" data-rej="${esc(p.id)}">Reject</button></div></div>`).join("")
+    : `<p class="hint">Nothing waiting. New screenshots appear here automatically, and you also get an email.</p>`}
+  ${pm.recent.length ? `<details class="pay-recent"><summary>Recent decisions (${pm.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Ref</th><th>Result</th><th>When</th></tr>${pm.recent.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${money(p.amount)}</td><td>${esc(p.ref || "–")}</td><td>${p.status === "approved" ? `<span class="badge ok">Approved</span>` : `<span class="badge warn">Rejected</span>${p.note ? " " + esc(p.note) : ""}`}</td><td>${when(p.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
+}
+function payTabBadge(n) { const b = document.querySelector('#admin-root [data-t="exam"]'); if (b) b.innerHTML = "Exam &amp; coupons" + (n ? ` <span class="tab-dot">${n}</span>` : ""); }
+function bindPayQueue() {
+  const key = store.get("idta-admin-key", ""), q = $("#pay-queue"); if (!q) return;
+  q.querySelectorAll("[data-pview]").forEach(b => b.onclick = () => busy(b, "Loading…", async () => {
+    const r = await api("adminPaymentImage", { key, id:b.dataset.pview });
+    const box = $("#img-" + b.dataset.pview); if (!box) return;
+    box.innerHTML = r.ok ? `<a href="data:${esc(r.mime)};base64,${r.image}" target="_blank" rel="noopener"><img src="data:${esc(r.mime)};base64,${r.image}" alt="Payment screenshot"></a>` : `<p class="hint">${esc(errMsg(r.error))}</p>`;
+    b.hidden = r.ok;
+  }));
+  const decide = (b, approve) => busy(b, approve ? "Unlocking…" : "Rejecting…", async () => {
+    const id = b.dataset.appr || b.dataset.rej;
+    const r = await api("adminDecidePayment", { key, id, approve, amount:+($("#amt-" + id) || {}).value || 0, note:($("#why-" + id) || {}).value || "" });
+    if (!r.ok) return toast(errMsg(r.error));
+    toast(approve ? "Approved. Their exams are unlocked." : "Rejected. They can upload a new screenshot."); adminRender();
+  });
+  q.querySelectorAll("[data-appr]").forEach(b => b.onclick = () => decide(b, true));
+  q.querySelectorAll("[data-rej]").forEach(b => b.onclick = () => { if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Click to confirm"; return; } decide(b, false); });
+}
+// Admins: watch for new payment screenshots every 30 s while the admin page is open.
+setInterval(async () => {
+  if (!SYNC_URL || $("#view-admin").hidden || !store.get("idta-admin-key", "")) return;
+  const pm = await api("adminPayments", { key:store.get("idta-admin-key", "") }, { retries:0 });
+  if (!pm.ok) return;
+  payTabBadge(pm.pending.length);
+  const ids = pm.pending.map(p => p.id).join();
+  if (ids !== (AD.payIds || "")) {
+    if (pm.pending.some(p => !(AD.payIds || "").split(",").includes(p.id))) toast("💷 New payment screenshot to check");
+    AD.payIds = ids;
+    const q = $("#pay-queue"); if (q && !q.querySelector(".pay-img img") && document.activeElement && !q.contains(document.activeElement)) { q.innerHTML = payQueueHTML(pm); bindPayQueue(); }
+  }
+}, 30000);
 async function adminExam() {
   const key = store.get("idta-admin-key", ""), body = $("#ad-body");
-  const [d, sl] = await Promise.all([api("adminCoupons", { key }), api("adminSales", { key })]);
+  const [d, sl, pm] = await Promise.all([api("adminCoupons", { key }), api("adminSales", { key }), api("adminPayments", { key })]);
   if (!d.ok) { body.innerHTML = `<p class="hint">${esc(d.error === "unknown_action" ? "Update Code.gs in Apps Script to use coupons (see backend/SETUP.md)." : errMsg(d.error))}</p>`; return; }
   const c = d.exam || { lock:true, price:"£3", how:"" };
   const fmt = s => { const t = new Date(s); return s && !isNaN(t) ? t.toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" }) : ""; };
   const list = cs => cs.length ? `<div class="tbl"><table id="cp-table"><tr><th>Code</th><th>Used</th><th>Value</th><th>Expires</th><th>Note</th><th>Created</th><th></th></tr>${cs.map(x => { const dead = x.used >= x.max || (x.expires && new Date(x.expires).getTime() < Date.now()); return `<tr${dead ? ' class="dim"' : ""}><td><code>${esc(x.code)}</code> <button class="btn small" data-copy="${esc(x.code)}">Copy</button></td><td class="num">${x.used} / ${x.max}</td><td class="num">${x.value ? money(x.value) : "free"}</td><td>${x.expires ? fmt(x.expires) : "never"}</td><td>${esc(x.note)}</td><td>${fmt(x.created)}</td><td><button class="btn small" data-del="${esc(x.code)}">Delete</button></td></tr>`; }).join("")}</table></div>` : `<p class="hint">No codes yet.</p>`;
-  body.innerHTML = `${sl.ok ? salesHTML(sl) : ""}<div class="card" style="margin-bottom:1rem"><h2>Course exam access</h2><p class="hint">Practice, lessons, Calc Lab and flashcards are always free. The verified university module exam (e.g. Portsmouth) is always free for verified students. This setting only controls the AI &amp; ML course exam.</p>
+  body.innerHTML = `${pm.ok ? `<div id="pay-queue">${payQueueHTML(pm)}</div>` : ""}${sl.ok ? salesHTML(sl) : ""}<div class="card" style="margin-bottom:1rem"><h2>Course exam access</h2><p class="hint">Practice, lessons, Calc Lab and flashcards are always free. The verified university module exam (e.g. Portsmouth) is always free for verified students. This setting only controls the AI &amp; ML course exam.</p>
   <form id="f-excfg" novalidate><label class="chk"><input type="checkbox" id="ec-lock" ${c.lock ? "checked" : ""}> Students need a code (or a grant from you) to take the course exam</label>
   ${field("ec-price","Price shown","text",'maxlength="20" placeholder="£3"')}
   <div class="field"><label for="ec-how">How to pay / get a code (shown on the lock screen to logged-in students)</label><textarea id="ec-how" rows="4" maxlength="600" placeholder="e.g. Pay £3 at [your payment link], then WhatsApp your payment reference to the organiser and you'll get a code."></textarea></div>
@@ -1921,6 +2025,7 @@ async function adminExam() {
     });
   };
   bindList();
+  if (pm.ok) { AD.payIds = pm.pending.map(p => p.id).join(); bindPayQueue(); payTabBadge(pm.pending.length); }
   $("#f-cp").onsubmit = async e => { e.preventDefault(); await busy(e.target.querySelector("button[type=submit]"), "Creating…", async () => {
     const r = await api("adminCreateCoupon", { key, code:$("#cp-code").value.trim(), uses:+$("#cp-uses").value || 1, days:+$("#cp-days").value || 0, value:+$("#cp-value").value || 0, note:$("#cp-note").value.trim() });
     if (!r.ok) { $("#cp-msg").innerHTML = `<div class="feedback no">${esc(errMsg(r.error))}</div>`; return; }
