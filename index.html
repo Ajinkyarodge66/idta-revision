@@ -2321,10 +2321,15 @@ function uvStep() {
   const box = $("#uv-box"); if (!box) return;
   const msg = (ok, t) => { $("#uv-msg").innerHTML = `<div class="feedback ${ok ? "ok" : "no"}" role="alert">${esc(t)}</div>`; };
   if (UV.step === "email") {
-    box.innerHTML = `<form id="f-uv1" novalidate>${field("uv-email","University email address","email",'autocomplete="email" placeholder="up1234567@myport.ac.uk"')}<div id="uv-msg"></div><button class="btn primary" type="submit">Email me a code</button></form>`;
+    box.innerHTML = `<form id="f-uv1" novalidate>${field("uv-email","University email or student number","text",'autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="up1234567@myport.ac.uk or up1234567"')}<p class="hint" style="margin-top:-.4rem">Portsmouth students: type your UP number (for example <b>up1234567</b>) or your full <b>@myport.ac.uk</b> email. Use your university address, not Gmail or Outlook.</p><div id="uv-msg"></div><button class="btn primary" type="submit">Email me a code</button></form>`;
     $("#f-uv1").onsubmit = async e => {
-      e.preventDefault(); const email = $("#uv-email").value.trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return msg(false, "Enter your full university email address.");
+      e.preventDefault(); let email = $("#uv-email").value.replace(/\s+/g, "").toLowerCase();
+      if (/^up\d{5,9}$/.test(email)) email += "@myport.ac.uk";                 // Portsmouth student number on its own
+      else if (/^up\d{5,9}@$/.test(email)) email += "myport.ac.uk";            // typed "up1234567@"
+      else if (/^up\d{5,9}@myport$/.test(email)) email += ".ac.uk";           // typed "up1234567@myport"
+      else if (/^\d{5,9}$/.test(email)) email = "up" + email + "@myport.ac.uk"; // typed just the digits
+      $("#uv-email").value = email;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return msg(false, "Enter your UP number (for example up1234567) or your full university email address.");
       await busy(e.target.querySelector("button"), "Sending…", async () => {
         const r = await api("verifyStart", { token:AUTH.token(), email });
         if (r.error === "auth") return sessionExpired();
