@@ -16,7 +16,7 @@ The backend is a Google Apps Script attached to a Google Sheet you own. It store
 
 ## Private university packs (`Pack.gs`)
 
-The University of Portsmouth IDTA material (module notes, the 25 official sample-paper questions and the lab questions) is **not in this public repository**. It lives in a second script file that only your Google Script can read, and it's served only to students whose university email is verified.
+The University of Portsmouth IDTA material (module notes and all 219 module questions, including the 25 official sample-paper questions) is **not in this public repository**. It lives in a second script file that only your Google Script can read, and it's served only to students whose university email is verified.
 
 1. In Apps Script, click **+ (Add a file) → Script** and name it `Pack`.
 2. Paste the private `Pack.gs` you were given and click **Save**. Never commit it to GitHub or share it.

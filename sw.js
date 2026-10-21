@@ -1,5 +1,5 @@
 // Offline support: cache the app shell, serve it when offline, refresh in the background.
-const CACHE = 'idta-v10';
+const CACHE = 'idta-v11';
 const FILES = ['./', './index.html', './privacy.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './assets/shot-practice.png', './assets/shot-mock.png', './assets/shot-lab.png', './assets/shot-progress.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

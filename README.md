@@ -2,8 +2,8 @@
 
 A free study app with two parts:
 
-- **AI & Machine Learning course**, open to students at any university: 26 in-depth lessons in 8 units, from statistics and the maths of learning to transformers, generative AI and MLOps, with 210+ exam-style questions, a course exam, Calc Lab and flashcards.
-- **University of Portsmouth IDTA Part 1 pack**, for verified Portsmouth students only (@myport.ac.uk email check): module notes, the official sample paper and an exam-format mock (30 questions, 60 minutes, closed book, no calculator).
+- **AI & Machine Learning course**, open to students at any university: 26 in-depth lessons in 8 units, from statistics and the maths of learning to transformers, generative AI and MLOps, with 100+ exam-style questions, a course exam, Calc Lab and flashcards.
+- **University of Portsmouth IDTA Part 1 pack**, for verified Portsmouth students only (@myport.ac.uk email check): all 219 module questions (the official sample paper plus every other question, organised topic by topic in lecture order), module notes and an exam-format mock (30 questions, 60 minutes, closed book, no calculator).
 
 **▶ Open the app: https://ajinkyarodge66.github.io/idta-revision/**
 
@@ -16,9 +16,9 @@ It works on phones and laptops, and offline once it has loaded. On your phone, u
 | Tab | What you get |
 |---|---|
 | **Learn** | The 26-lesson AI & ML course, each lesson with worked examples, code, key takeaways and a quick check |
-| **My university** | Verify your university email to unlock your private module pack (University of Portsmouth IDTA: notes, sample paper, module mock) |
+| **My university** | Verify your university email to unlock your private module pack (University of Portsmouth IDTA: notes, sample paper, practice by syllabus topic, module mock) |
 | **Must-know** | 61 one-line facts to tick off as you memorise them |
-| **Practice** | 210+ questions (single answer, multiple response, matching) with instant explanations. **My mistakes** keeps every wrong answer until you get it right. Verified Portsmouth students also get the 25 official sample-paper questions |
+| **Practice** | 100+ course questions (single answer, multiple response, matching) with instant explanations. **My mistakes** keeps every wrong answer until you get it right. Verified Portsmouth students also get all 219 module questions, including the 25 official sample-paper questions |
 | **Calc Lab** | Unlimited fresh calculation questions with worked solutions: confusion-matrix metrics, min-max, distances, support/confidence/lift, Gini, Naïve Bayes, k-means centroids, linkage, mean/median/mode, IQR fences, MAE/MSE/RMSE, binning, weighted mean |
 | **Mock exam** | Full (30 questions / 60 min) or quick (10 questions / 20 min) mocks, with flags, auto-submit, per-topic breakdown and keyboard shortcuts |
 | **Flashcards** | 65 flip cards, filterable by topic |
@@ -41,7 +41,7 @@ Organisers: see [`backend/SETUP.md`](backend/SETUP.md). For your own web address
 ## Suggested plan
 
 1. Read the cheat sheet once.
-2. Answer the 25 official sample-paper questions in Practice.
+2. Portsmouth students: answer the 25 official sample-paper questions, then work through **Practise by syllabus topic** in My university.
 3. Take a full mock exam.
 4. Drill your weakest topics (the Progress tab shows them) and do 10 Calc Lab questions a day.
 5. Clear **My mistakes** to zero and tick every line in **Must-know**.
