@@ -16,7 +16,8 @@ const SHEETS = {
   events:   { name: 'Events',   cols: ['Time', 'User ID', 'Name', 'Event', 'Topic', 'Question', 'Correct', 'Score', 'Out of', 'Detail'] },
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
   questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] },
-  coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by'] }
+  coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by', 'Value per use'] },
+  certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] }
 };
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
 const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20 };
@@ -197,7 +198,7 @@ const API = {
 
   events: b => {
     const m = me_(b); if (!m) return fail_('auth');
-    const list = Array.isArray(b.events) ? b.events.slice(0, 300) : [];
+    const list = (Array.isArray(b.events) ? b.events.slice(0, 300) : []).filter(ev => ev && ['q', 'mock', 'lab'].indexOf(ev.t) >= 0);   // sales/revoke rows come only from the server
     if (!list.length) return { ok: true, saved: 0 };
     const name = String(m.r[U.name]);
     const rows = list.map(ev => [
@@ -451,6 +452,7 @@ const API = {
     sh.getRange(i + 1, 7).setValue(String(c[6] || '') ? String(c[6]) + ',' + m.uid : m.uid);
     const grant = 'coupon ' + code + ' · ' + now_();
     setCell_(m.sh, m.i, U.exam, grant);
+    sale_(m.uid, m.r[U.name], Number(c[7]) || 0, 'coupon ' + code);
     const row = m.r.slice(); row[U.exam] = grant;
     return { ok: true, profile: profile_(row) };
   }),
@@ -463,7 +465,8 @@ const API = {
     else if (rowOf_(v, 0, code) > 0) return fail_('code_exists');
     const uses = Math.max(1, Math.min(1000, Math.floor(Number(b.uses) || 1)));
     const days = Math.max(0, Math.min(365, Math.floor(Number(b.days) || 0)));
-    sh.appendRow([code, now_(), uses, 0, days ? new Date(Date.now() + days * 864e5).toISOString() : '', text_(b.note, 80), '']);
+    const value = money_(b.value);
+    sh.appendRow([code, now_(), uses, 0, days ? new Date(Date.now() + days * 864e5).toISOString() : '', text_(b.note, 80), '', value]);
     return { ok: true, code: code, coupons: couponsList_() };
   }),
   adminDeleteCoupon: b => admin_(b, () => {
@@ -477,6 +480,8 @@ const API = {
     if (i < 0) return fail_('no_user');
     const val = b.on ? 'granted by admin · ' + now_() : '';
     setCell_(all.sh, i, U.exam, val);
+    if (b.on) sale_(String(all.v[i][U.id]), all.v[i][U.name], money_(b.amount), money_(b.amount) ? 'admin (paid)' : 'admin (free)');
+    else if (all.v[i][U.exam]) sheet_('events').appendRow([now_(), String(all.v[i][U.id]), text_(all.v[i][U.name], 40), 'revoke', '', '', '', 0, '', 'admin']);
     return { ok: true, id: String(all.v[i][U.id]), examAccess: val };
   }),
   // lock: whether the course exam needs access; price: shown on the lock screen; how: how to pay (shown only to logged-in students).
@@ -486,6 +491,38 @@ const API = {
     cache_().remove('config');
     return { ok: true, exam: examCfg_() };
   }),
+  adminSales: b => admin_(b, () => {
+    const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => r[3] === 'unlock' || r[3] === 'revoke');
+    const users = usersAll_().v.slice(1);
+    return { ok: true, exam: examCfg_(), accounts: users.length, unlocked: users.filter(r => r[U.exam]).length,
+      sales: ev.map(r => ({ ts: new Date(r[0]).getTime(), id: String(r[1]), name: String(r[2]).replace(/^'/, ''), kind: String(r[3]), amount: Number(r[7]) || 0, how: String(r[9] || '') })) };
+  }),
+
+  /* ----- certificates ----- */
+  certIssue: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const n = Math.floor(Number(b.n)), score = Math.floor(Number(b.score)), exam = text_(b.exam, 40);
+    if (n !== 30 || !(score >= 21 && score <= 30) || exam.length < 3) return fail_('not_eligible');
+    const key = 'cert:' + m.uid;
+    if (tooMany_(key, 10)) return fail_('too_many_attempts');
+    const sh = sheet_('certs'), v = sh.getDataRange().getValues();
+    for (let i = 1; i < v.length; i++) if (String(v[i][2]) === m.uid && String(v[i][6]) === exam && Number(v[i][4]) >= score) return { ok: true, cert: certOut_(v[i]) };
+    bump_(key, 86400);
+    let id; do { id = 'C' + sha_(Utilities.getUuid()).slice(0, 9).toUpperCase(); } while (rowOf_(v, 0, id) > 0);
+    const row = [id, now_(), m.uid, text_(m.r[U.name], 40), score, n, exam];
+    sh.appendRow(row);
+    return { ok: true, cert: certOut_(row) };
+  }),
+  cert: b => {
+    const id = String(b.id || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (id.length !== 10) return fail_('no_cert');
+    const v = sheet_('certs').getDataRange().getValues(), i = rowOf_(v, 0, id);
+    return i < 0 ? fail_('no_cert') : { ok: true, cert: certOut_(v[i]) };
+  },
+  myCerts: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    return { ok: true, certs: sheet_('certs').getDataRange().getValues().slice(1).filter(r => String(r[2]) === m.uid).map(certOut_).reverse() };
+  },
 
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
@@ -522,11 +559,14 @@ function examCfg_() {
   c = c || {};
   return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '' };
 }
+function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
+function sale_(uid, name, amount, how) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, '', text_(how, 60)]); }
+function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, '') }; }
 function couponCode_(v) { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); return s.length >= 4 && s.length <= 24 ? s : ''; }
 function couponsList_() {
   return sheet_('coupons').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
     code: String(r[0]), created: String(r[1]), max: Number(r[2]) || 1, used: Number(r[3]) || 0, expires: String(r[4] || ''), note: String(r[5] || '').replace(/^'/, ''),
-    usedBy: String(r[6] || '').split(',').filter(Boolean).length })).reverse();
+    usedBy: String(r[6] || '').split(',').filter(Boolean).length, value: Number(r[7]) || 0 })).reverse();
 }
 function domains_() { try { return JSON.parse(props_().getProperty('UNI_DOMAINS') || 'null') || DEFAULT_DOMAINS; } catch (e) { return DEFAULT_DOMAINS; } }
 function packs_() { return typeof PACKS !== 'undefined' ? PACKS : {}; }   // PACKS lives in Pack.gs (kept private, never in the public repo)
@@ -605,13 +645,13 @@ function doPost(e) {
 }
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  try { return out_(p.action === 'leaderboard' ? API.leaderboard() : p.action === 'config' ? API.config() : API.ping()); }
+  try { return out_(p.action === 'leaderboard' ? API.leaderboard() : p.action === 'config' ? API.config() : p.action === 'cert' ? API.cert(p) : API.ping()); }
   catch (err) { return out_(fail_('server_error')); }
 }
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();

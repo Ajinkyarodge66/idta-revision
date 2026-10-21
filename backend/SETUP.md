@@ -32,7 +32,8 @@ Lessons, Practice, Calc Lab and flashcards are free for everyone, and verified u
 - **Admin → Exam & coupons** lets you turn the lock on or off, set the price shown (default £3), and write the "how to pay / get a code" text that logged-in students see on the lock screen.
 - **Create a coupon code**: leave the code blank to generate one (e.g. `IDTA-7F3K2A`), or type your own (e.g. `WELCOME`). Choose how many students can use it and when it expires. The note is only for you, e.g. who paid.
 - Students enter the code on the **Mock exam** tab, and it unlocks immediately for their account on every device.
-- To unlock one student directly, for example after they pay you, use **Grant exam** in **Admin → Overview → Students**.
+- Each code has a **value per use** (e.g. £3, or 0 for a free promo code). To unlock one student directly, use **Paid £3** or **Free** in **Admin → Overview → Students**.
+- The **Sales** panel at the top of Exam & coupons totals what you recorded: revenue, this month, paid vs free unlocks, conversion and a 30-day chart. It only counts what you record, so check it against your bank or payment app.
 
 Codes and who used them are stored in the **Coupons** sheet. The lock is on by default once this version of `Code.gs` is deployed.
 
@@ -50,10 +51,11 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 |---|---|
 | **Users** | ID, created, name, mobile, email, university, course, password hash + salt (never the password), leaderboard choice, saved progress, last login, reset code hash, consent time, university email, verified university, verification code hash, exam access (how it was unlocked) |
 | **Sessions** | Login tokens, stored only as hashes, with a 30-day expiry |
-| **Events** | One row per answer, mock or Calc Lab attempt |
+| **Events** | One row per answer, mock or Calc Lab attempt, plus `unlock`/`revoke` rows for exam access (with the amount) |
 | **Announcements** | Banners you post from the admin page (title, message, style, expiry) |
 | **Questions** | Questions you add from the admin page (IDs from 1000 up) |
-| **Coupons** | Exam coupon codes: code, max uses, times used, expiry, your note, and which accounts used it |
+| **Coupons** | Exam coupon codes: code, max uses, times used, expiry, your note, which accounts used it, and value per use |
+| **Certificates** | Certificates students claimed: ID, date, user, name, score and exam. Anyone can check one at `…/#cert=ID` |
 
 Hidden built-in questions are saved in the `HIDDEN_Q` script property.
 
