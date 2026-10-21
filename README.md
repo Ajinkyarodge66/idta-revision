@@ -20,12 +20,12 @@ It works on phones and laptops, and offline once it has loaded. On your phone, u
 | **Must-know** | 61 one-line facts to tick off as you memorise them |
 | **Practice** | 100+ course questions (single answer, multiple response, matching) with instant explanations. **My mistakes** keeps every wrong answer until you get it right. Verified Portsmouth students also get all 219 module questions, including the 25 official sample-paper questions |
 | **Calc Lab** | Unlimited fresh calculation questions with worked solutions: confusion-matrix metrics, min-max, distances, support/confidence/lift, Gini, Naïve Bayes, k-means centroids, linkage, mean/median/mode, IQR fences, MAE/MSE/RMSE, binning, weighted mean |
-| **Mock exam** | Full (30 questions / 60 min) or quick (10 questions / 20 min) mocks, with flags, auto-submit, per-topic breakdown and keyboard shortcuts |
+| **Mock exam** | Full (30 questions / 60 min) or quick (10 questions / 20 min) mocks, with flags, auto-submit, per-topic breakdown and keyboard shortcuts. The course exam unlocks with a code (£3); verified students' university module exam is free |
 | **Flashcards** | 65 flip cards, filterable by topic |
 | **Progress** | Readiness score, accuracy by topic, coverage of the question bank, and mock score history |
 | **Leaderboard** | Class leaderboard (best mock score, questions answered, accuracy) and "where the class struggles" by topic |
 | **Account** | Edit your details, change password, log out, delete account |
-| **Admin** (organiser only) | Class overview, **announcements** banner, **add/edit your own questions**, hide built-in questions, **CSV export** |
+| **Admin** (organiser only) | Class overview, **exam coupon codes** and access grants, **announcements** banner, **add/edit your own questions**, hide built-in questions, **CSV export** |
 
 Topics: data & statistics, similarity & distance, data preparation, classification (decision trees, Naïve Bayes, SVM), evaluation, neural networks & deep learning, ensembles, regression, association rules (Apriori), clustering, and Python/lab code.
 

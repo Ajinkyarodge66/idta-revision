@@ -7,18 +7,19 @@
  *   Events   activity rows (answers, mocks, Calc Lab)
  *
  * All requests are POST with a JSON body {action, ...}. GET ?action=ping is a health check.
- * Setup: backend/SETUP.md. Script properties: ADMIN_KEY (you set it), PEPPER (auto-created).
+ * Setup: backend/SETUP.md. Script properties: ADMIN_KEY (you set it), PEPPER (auto-created), EXAM_CFG (set from Admin).
  */
 const APP = 'IDTA Revision';
 const SHEETS = {
-  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires'] },
+  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access'] },
   sessions: { name: 'Sessions', cols: ['Token hash', 'User ID', 'Created', 'Expires'] },
   events:   { name: 'Events',   cols: ['Time', 'User ID', 'Name', 'Event', 'Topic', 'Question', 'Correct', 'Score', 'Out of', 'Detail'] },
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
-  questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] }
+  questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] },
+  coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by'] }
 };
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
-const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19 };
+const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20 };
 const DEFAULT_DOMAINS = { 'myport.ac.uk': 'University of Portsmouth', 'port.ac.uk': 'University of Portsmouth' };
 const SESSION_DAYS = 30;
 const MAX_PROGRESS_CHARS = 45000;
@@ -90,7 +91,7 @@ function setCell_(sh, i, col, val) { sh.getRange(i + 1, col + 1).setValue(val); 
 function profile_(r) {
   return { id: String(r[U.id]), pid: pid_(r[U.id]), name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]),
     university: String(r[U.uni]), course: String(r[U.course]), lb: r[U.lb] === 'yes', created: String(r[U.created]),
-    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || '') };
+    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: !!r[U.exam] };
 }
 function progress_(r) { try { return r[U.prog] ? JSON.parse(r[U.prog]) : null; } catch (e) { return null; } }
 function newSession_(uid) {
@@ -303,7 +304,7 @@ const API = {
     const questions = sheet_('questions').getDataRange().getValues().slice(1).filter(r => r[0] !== '' && !r[8]).map(qOut_).filter(Boolean);
     let hidden = [];
     try { hidden = JSON.parse(props_().getProperty('HIDDEN_Q') || '[]'); } catch (e) {}
-    const out = { ok: true, news: news, questions: questions, hidden: hidden, unis: unis_(), at: now };
+    const out = { ok: true, news: news, questions: questions, hidden: hidden, unis: unis_(), exam: examCfg_(), at: now };
     const str = JSON.stringify(out);
     if (str.length < 90000) cache_().put('config', str, 60);
     return out;
@@ -434,6 +435,58 @@ const API = {
     return { ok: true, domains: domains_(), packs: Object.keys(packs_()) };
   }),
 
+  /* ----- exam access: coupon codes and manual grants ----- */
+  redeem: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const key = 'redeem:' + m.uid;
+    if (tooMany_(key, 8)) return fail_('too_many_attempts');
+    if (m.r[U.exam]) return { ok: true, already: true, profile: profile_(m.r) };
+    const code = couponCode_(b.code);
+    const sh = sheet_('coupons'), v = sh.getDataRange().getValues(), i = code ? rowOf_(v, 0, code) : -1;
+    if (i < 0) { bump_(key, 900); return fail_('bad_coupon'); }
+    const c = v[i], max = Number(c[2]) || 1, used = Number(c[3]) || 0;
+    if (c[4] && new Date(c[4]).getTime() < Date.now()) return fail_('coupon_expired');
+    if (used >= max) return fail_('coupon_used_up');
+    sh.getRange(i + 1, 4).setValue(used + 1);
+    sh.getRange(i + 1, 7).setValue(String(c[6] || '') ? String(c[6]) + ',' + m.uid : m.uid);
+    const grant = 'coupon ' + code + ' · ' + now_();
+    setCell_(m.sh, m.i, U.exam, grant);
+    const row = m.r.slice(); row[U.exam] = grant;
+    return { ok: true, profile: profile_(row) };
+  }),
+  adminCoupons: b => admin_(b, () => ({ ok: true, exam: examCfg_(), coupons: couponsList_() })),
+  adminCreateCoupon: b => admin_(b, () => {
+    let code = couponCode_(b.code);
+    if (b.code && !code) return fail_('bad_code');
+    const sh = sheet_('coupons'), v = sh.getDataRange().getValues();
+    if (!code) { do { code = 'IDTA-' + sha_(Utilities.getUuid()).slice(0, 6).toUpperCase(); } while (rowOf_(v, 0, code) > 0); }
+    else if (rowOf_(v, 0, code) > 0) return fail_('code_exists');
+    const uses = Math.max(1, Math.min(1000, Math.floor(Number(b.uses) || 1)));
+    const days = Math.max(0, Math.min(365, Math.floor(Number(b.days) || 0)));
+    sh.appendRow([code, now_(), uses, 0, days ? new Date(Date.now() + days * 864e5).toISOString() : '', text_(b.note, 80), '']);
+    return { ok: true, code: code, coupons: couponsList_() };
+  }),
+  adminDeleteCoupon: b => admin_(b, () => {
+    const code = couponCode_(b.code);
+    dropRows_(sheet_('coupons'), r => String(r[0]) !== code);
+    return { ok: true, coupons: couponsList_() };
+  }),
+  // Grant (on = true) or remove exam access for one student, e.g. after they pay you directly.
+  adminSetExam: b => admin_(b, () => {
+    const all = usersAll_(), i = rowOf_(all.v, U.id, String(b.id || ''));
+    if (i < 0) return fail_('no_user');
+    const val = b.on ? 'granted by admin · ' + now_() : '';
+    setCell_(all.sh, i, U.exam, val);
+    return { ok: true, id: String(all.v[i][U.id]), examAccess: val };
+  }),
+  // lock: whether the course exam needs access; price: shown on the lock screen; how: how to pay (shown only to logged-in students).
+  adminSetExamConfig: b => admin_(b, () => {
+    const cfg = { lock: !!b.lock, price: plain_(b.price, 20) || '£3', how: String(b.how || '').split(/\r?\n/).map(l => plain_(l, 200)).join('\n').trim().slice(0, 600) };
+    props_().setProperty('EXAM_CFG', JSON.stringify(cfg));
+    cache_().remove('config');
+    return { ok: true, exam: examCfg_() };
+  }),
+
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
     if (hit) return JSON.parse(hit);
@@ -458,11 +511,23 @@ const API = {
       users: users.map(r => Object.assign({
         id: String(r[U.id]), name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]),
         university: String(r[U.uni]), course: String(r[U.course]), lb: r[U.lb] === 'yes', created: String(r[U.created]), lastLogin: String(r[U.last]),
-        uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || '')
+        uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: String(r[U.exam] || '')
       }, s.users[String(r[U.id])] || blank_()))
     };
   }
 };
+function examCfg_() {
+  let c = null;
+  try { c = JSON.parse(props_().getProperty('EXAM_CFG') || 'null'); } catch (e) {}
+  c = c || {};
+  return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '' };
+}
+function couponCode_(v) { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); return s.length >= 4 && s.length <= 24 ? s : ''; }
+function couponsList_() {
+  return sheet_('coupons').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
+    code: String(r[0]), created: String(r[1]), max: Number(r[2]) || 1, used: Number(r[3]) || 0, expires: String(r[4] || ''), note: String(r[5] || '').replace(/^'/, ''),
+    usedBy: String(r[6] || '').split(',').filter(Boolean).length })).reverse();
+}
 function domains_() { try { return JSON.parse(props_().getProperty('UNI_DOMAINS') || 'null') || DEFAULT_DOMAINS; } catch (e) { return DEFAULT_DOMAINS; } }
 function packs_() { return typeof PACKS !== 'undefined' ? PACKS : {}; }   // PACKS lives in Pack.gs (kept private, never in the public repo)
 function unis_() {
@@ -546,7 +611,7 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();

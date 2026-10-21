@@ -258,6 +258,16 @@ body.locked nav.tabs,body.locked .hdr-actions,body.locked main>section:not(#auth
 textarea{font:inherit;width:100%;min-width:0;padding:.6rem .75rem;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);resize:vertical}
 .sel{font:inherit;padding:.45rem .6rem;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:100%}
 .filters button#ad-out{border-style:dashed}
+.unlock{border-color:var(--accent);margin-top:1rem}
+.unlock-row input::placeholder{text-transform:none;letter-spacing:0}
+.unlock-head{display:flex;gap:.8rem;align-items:flex-start}.unlock-head h2{margin:0 0 .25rem}
+.unlock-ic{font-size:1.6rem;line-height:1}
+.unlock-form{margin:1rem 0}.unlock-form label{font-weight:600;display:block;margin-bottom:.35rem}
+.unlock-row{display:flex;gap:.5rem;flex-wrap:wrap}.unlock-row input{flex:1 1 12rem;min-width:0;text-transform:uppercase;letter-spacing:.04em;font:inherit;padding:.6rem .75rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.unlock-how{border-top:1px solid var(--line);padding-top:.8rem}
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:0 1rem}
+label.chk{display:flex;gap:.5rem;align-items:center;margin-bottom:.8rem}
+tr.dim td{opacity:.55}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -837,7 +847,26 @@ function pickMock(n){
 }
 function hasPackExam(){return typeof PACK!=="undefined"&&!!PACK&&!!PACK.exam}
 function EX(m){m=m||MK.mode||(hasPackExam()?"pack":"course");const e=(m==="pack"&&hasPackExam())?PACK.exam:null;return e?{title:e.title||"Module mock exam",desc:e.desc||"",n:e.n||30,minutes:e.minutes||60}:{title:"AI & ML practice exam",desc:"30 questions across every topic of the course in 60 minutes, with no feedback until you submit, just like a real computer-based exam. Use the quick mock for a 20-minute check.",n:30,minutes:60}}
-function startMock(n,mins){MK.n=n;MK.mins=mins;MK.items=pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;mockRender()}
+const examCfg=()=>{try{return (CONFIG&&CONFIG.exam)||null}catch(e){return null}};
+function examLocked(){try{const c=examCfg();if(!SYNC_URL||!c||!c.lock)return false;const a=AUTH.get();return !(a&&a.profile&&a.profile.examAccess)}catch(e){return false}}
+function startMock(n,mins){if(MK.mode!=="pack"&&examLocked()){MK.state="intro";return mockRender()}MK.n=n;MK.mins=mins;MK.items=pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;mockRender()}
+function examLockHTML(c){
+  const how=String(c.how||"").trim();
+  return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exam · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the full 30-question timed exam and quick mocks, with unlimited attempts. Lessons, Practice, Calc Lab and flashcards stay free.</p></div></div>
+  <form id="f-unlock" class="unlock-form" novalidate><label for="ex-code">Have a code?</label><div class="unlock-row"><input id="ex-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="e.g. IDTA-7F3K2A"><button class="btn primary" type="submit">Unlock</button></div><div id="ex-msg" role="status"></div></form>
+  <div class="unlock-how"><b>How to get a code</b>${how?`<p style="white-space:pre-line;margin:.3rem 0 0">${esc(how)}</p>`:`<p style="margin:.3rem 0 0">Ask the organiser of your study group for a code.</p>`}</div></div>`;
+}
+function bindExamLock(){
+  const f=$("#f-unlock");if(!f)return;
+  f.onsubmit=async e=>{e.preventDefault();const code=$("#ex-code").value.trim();const m=(ok,t)=>$("#ex-msg").innerHTML=`<div class="feedback ${ok?"ok":"no"}">${esc(t)}</div>`;
+    if(code.length<4)return m(false,"Enter the code you were given.");
+    await busy(f.querySelector("button"),"Checking…",async()=>{
+      const r=await api("redeem",{token:AUTH.token(),code});
+      if(!r.ok)return m(false,errMsg(r.error));
+      AUTH.set({...AUTH.get(),profile:r.profile});toast("Exam unlocked. Good luck!");MK.mode="course";MK.chosen=true;mockRender();
+    });
+  };
+}
 function mockRender(){
   const root=$("#mock-root");
   clearInterval(MK.timer);
@@ -849,6 +878,7 @@ function mockRender(){
     const pick=hasPackExam()?`<div class="filters" role="group" aria-label="Choose exam" style="margin:0 0 1rem"><button aria-pressed="${MK.mode==="pack"}" data-mode="pack">${esc(EX("pack").title)}</button><button aria-pressed="${MK.mode==="course"}" data-mode="course">AI &amp; ML course exam</button></div>`:"";
     root.innerHTML=`<div class="intro">${pick}<h1>${esc(EX().title)}</h1><p class="lede">${esc(EX().desc)}</p><ul><li>You can move between questions and change answers at any time. Flag questions to come back to them.</li><li>Multiple-response and matching questions count as correct only when fully right. Moodle may award partial credit, so treat this as the strict score.</li><li>When the timer reaches zero, the exam submits automatically.</li><li class="kbd-hint">Keyboard: <span class="kbd">1</span>–<span class="kbd">6</span> choose an option, <span class="kbd">←</span> <span class="kbd">→</span> move between questions, <span class="kbd">F</span> flag.</li></ul><p>Have a sheet of paper ready for working${MK.mode==="pack"?". Don't use a calculator; the real exam doesn't allow one.":"."}</p>${best!==null?`<p class="hint">Best full-mock score on this device: <b>${best}/30</b>${hist.length?` · ${hist.length} mock${hist.length>1?"s":""} taken`:""}</p>`:""}<div class="qnav" style="justify-content:flex-start;gap:.5rem"><button class="btn primary" id="mk-start">Full exam · ${EX().n} questions · ${EX().minutes} min</button><button class="btn" id="mk-quick">Quick mock · 10 questions · 20 min</button></div></div>`;
     root.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{MK.mode=b.dataset.mode;MK.chosen=true;mockRender()});
+    if(MK.mode!=="pack"&&examLocked()){const c=examCfg(),act=root.querySelector(".intro > .qnav");if(act)act.outerHTML=examLockHTML(c);bindExamLock();return}
     $("#mk-start").onclick=()=>startMock(EX().n,EX().minutes);
     $("#mk-quick").onclick=()=>startMock(10,20);
     return;
@@ -1169,7 +1199,12 @@ const ERR = {
   wrong_password:"Your current password is incorrect.",
   auth:"Your session has ended. Please log in again.",
   no_crypto:"Your browser blocked secure sign-in. Open the app over https (the GitHub link) in an up-to-date browser.",
-  progress_too_big:"Your progress is too large to back up. Contact the organiser."
+  progress_too_big:"Your progress is too large to back up. Contact the organiser.",
+  bad_coupon:"That code isn't valid. Check it and try again.",
+  coupon_expired:"That code has expired. Ask for a new one.",
+  coupon_used_up:"That code has already been used the maximum number of times.",
+  code_exists:"A code with that name already exists. Choose another.",
+  no_user:"That student no longer exists. Refresh the page."
 };
 const errMsg = e => ERR[e] || ERR.server_error;
 
@@ -1511,8 +1546,10 @@ async function loadConfig() {
   const r = await api("config", {}, { retries:1 });
   if (!r.ok) return;
   const changed = JSON.stringify([r.news, r.questions, r.hidden]) !== JSON.stringify(CONFIG && [CONFIG.news, CONFIG.questions, CONFIG.hidden]);
+  const examChanged = JSON.stringify(r.exam || null) !== JSON.stringify((CONFIG && CONFIG.exam) || null);
   CONFIG = r; _rawSet("idta-config", r);
   if (changed) { applyConfig(r); refreshBankViews(); }
+  if (examChanged && MK.state === "intro") mockRender();
 }
 function newsRender() {
   const box = $("#news"); if (!box) return;
@@ -1549,13 +1586,14 @@ async function adminRender() {
     };
     return;
   }
-  const tabs = [["overview","Overview"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
+  const tabs = [["overview","Overview"],["exam","Exam & coupons"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
   root.innerHTML = `<div class="filters" role="tablist" aria-label="Admin sections" style="margin-bottom:1rem">${tabs.map(([k, l]) => `<button aria-pressed="${AD.tab === k}" data-t="${k}">${l}</button>`).join("")}<button id="ad-out" style="margin-left:auto">Sign out of admin</button></div><div id="ad-body"><p class="hint">Loading…</p></div>`;
   root.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { AD.tab = b.dataset.t; adminRender(); });
   $("#ad-out").onclick = () => { store.set("idta-admin-key", ""); AD.data = null; syncTabs(); show("learn"); };
   if (AD.tab === "news") return adminNews();
   if (AD.tab === "questions") return adminQuestions();
   if (AD.tab === "unis") return adminUnis();
+  if (AD.tab === "exam") return adminExam();
   const d = await api("admin", { key });
   if (!d.ok) {
     if (d.error === "bad_key") { store.set("idta-admin-key", ""); syncTabs(); return adminRender(); }
@@ -1577,7 +1615,7 @@ function adminOverview(d) {
   $("#ad-body").innerHTML = `<div class="qnav" style="justify-content:flex-start;gap:.5rem;margin-top:0"><button class="btn" id="ad-refresh">Refresh</button><span class="hint">${d.rows} activity rows · student details are personal data, so keep them private</span></div>
   <div class="tiles"><div class="tile"><div class="label">Accounts</div><div class="big">${users.length}</div><div class="sub">${users.filter(u => u.lb).length} on leaderboard</div></div><div class="tile"><div class="label">Active</div><div class="big">${users.filter(u => u.last > dayAgo).length}</div><div class="sub">last 24 h · ${users.filter(u => u.last > weekAgo).length} this week</div></div><div class="tile"><div class="label">Class accuracy</div><div class="big">${totQ ? Math.round(totR / totQ * 100) + "%" : "–"}</div><div class="sub">${totQ} answers · ${totM} mocks</div></div></div>
   <div class="search" style="margin-top:.5rem"><input type="search" id="ad-filter" placeholder="Filter students by name, mobile, email, university or course" aria-label="Filter students"><span class="score" id="ad-count"></span></div>
-  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td>${esc(u.name)}</td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Exam</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td>${esc(u.name)}</td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${u.examAccess ? `<span class="badge ok" title="${esc(u.examAccess)}">✓ Unlocked</span> <button class="btn small" data-exam="${esc(u.id)}" data-on="">Remove</button>` : `<button class="btn small" data-exam="${esc(u.id)}" data-on="1">Grant exam</button>`}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
   ${users.length ? `<div class="card" style="margin-bottom:1rem"><h2>Students by course</h2><div class="bars">${Object.keys(byCourse).sort((a, b) => byCourse[b] - byCourse[a]).map(k => `<div class="bar"><span>${esc(k)}</span><span class="track"><span class="fill" style="display:block;width:${byCourse[k] / users.length * 100}%"></span></span><span class="v">${byCourse[k]}</span></div>`).join("")}</div></div>` : ""}
   ${tp.length ? `<div class="card" style="margin-bottom:1rem"><h2>Topic accuracy (whole class)</h2><div class="bars">${tp.map(t => `<div class="bar"><span>${esc(TOPICS[t.k])}</span><span class="track"><span class="fill" style="display:block;width:${t.r / t.n * 100}%;background:${t.r / t.n >= .85 ? "var(--good)" : t.r / t.n >= .6 ? "var(--accent)" : "var(--bad)"}"></span></span><span class="v">${Math.round(t.r / t.n * 100)}% · ${t.n}</span></div>`).join("")}</div></div>` : ""}
   ${hard.length ? `<div class="card" style="margin-bottom:1rem"><h2>Hardest questions</h2><p class="hint">Lowest class accuracy, minimum 3 attempts. Good candidates to go over together, or to fix if the wording is unclear.</p><div class="tbl"><table><tr><th>Accuracy</th><th>Question</th><th>Topic</th></tr>${hard.map(x => `<tr><td class="num">${Math.round(x.r / x.n * 100)}% (${x.r}/${x.n})</td><td>${esc(Q[x.id].p.length > 120 ? Q[x.id].p.slice(0, 120) + "…" : Q[x.id].p)}</td><td>${esc(TOPICS[Q[x.id].t])}</td></tr>`).join("")}</table></div></div>` : ""}
@@ -1589,6 +1627,14 @@ function adminOverview(d) {
       const r = await api("adminSetAccess", { key:store.get("idta-admin-key", ""), id:b.dataset.acc, uni:b.dataset.uni });
       if (!r.ok) return toast(errMsg(r.error));
       toast(b.dataset.uni ? "Access granted." : "Access removed. They lose the private pack next time they open the app."); adminRender();
+    });
+  });
+  $("#ad-table").querySelectorAll("[data-exam]").forEach(b => b.onclick = async () => {
+    if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = b.dataset.on ? "Click to confirm" : "Click to confirm remove"; return; }
+    await busy(b, "Saving…", async () => {
+      const r = await api("adminSetExam", { key:store.get("idta-admin-key", ""), id:b.dataset.exam, on:!!b.dataset.on });
+      if (!r.ok) return toast(errMsg(r.error));
+      toast(b.dataset.on ? "Exam unlocked for this student." : "Exam access removed."); adminRender();
     });
   });
   $("#ad-filter").oninput = e => { const q = e.target.value.trim().toLowerCase(); let n = 0; $("#ad-table").querySelectorAll("tr[data-s]").forEach(tr => { const hit = !q || tr.dataset.s.includes(q); tr.hidden = !hit; if (hit) n++; }); $("#ad-count").textContent = q ? n + " shown" : ""; };
@@ -1603,6 +1649,46 @@ function adminExport(d) {
   $("#ex-topics").onclick = () => downloadCSV(`idta-topics-${stamp}.csv`, [["Topic","Correct","Attempts","Accuracy %"], ...Object.keys(d.topics || {}).filter(k => TOPICS[k]).map(k => [TOPICS[k], d.topics[k][0], d.topics[k][1], Math.round(d.topics[k][0] / d.topics[k][1] * 100)])]);
   $("#ex-qs").onclick = () => downloadCSV(`idta-questions-${stamp}.csv`, [["Question ID","Topic","Question","Correct","Attempts","Accuracy %"], ...Object.keys(d.questions || {}).filter(id => Q[id]).map(id => [id, TOPICS[Q[id].t], Q[id].p, d.questions[id][0], d.questions[id][1], Math.round(d.questions[id][0] / d.questions[id][1] * 100)])]);
   $("#ex-recent").onclick = () => downloadCSV(`idta-activity-${stamp}.csv`, [["Time","Name","Event","Topic","Question ID","Correct","Score","Out of","Detail"], ...(d.recent || []).map(r => [new Date(r.ts).toISOString(), r.name, r.ev, r.topic, r.qid, r.ok, r.s, r.n, r.k])]);
+}
+async function adminExam() {
+  const key = store.get("idta-admin-key", ""), body = $("#ad-body");
+  const d = await api("adminCoupons", { key });
+  if (!d.ok) { body.innerHTML = `<p class="hint">${esc(d.error === "unknown_action" ? "Update Code.gs in Apps Script to use coupons (see backend/SETUP.md)." : errMsg(d.error))}</p>`; return; }
+  const c = d.exam || { lock:true, price:"£3", how:"" };
+  const fmt = s => { const t = new Date(s); return s && !isNaN(t) ? t.toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" }) : ""; };
+  const list = cs => cs.length ? `<div class="tbl"><table id="cp-table"><tr><th>Code</th><th>Used</th><th>Expires</th><th>Note</th><th>Created</th><th></th></tr>${cs.map(x => { const dead = x.used >= x.max || (x.expires && new Date(x.expires).getTime() < Date.now()); return `<tr${dead ? ' class="dim"' : ""}><td><code>${esc(x.code)}</code> <button class="btn small" data-copy="${esc(x.code)}">Copy</button></td><td class="num">${x.used} / ${x.max}</td><td>${x.expires ? fmt(x.expires) : "never"}</td><td>${esc(x.note)}</td><td>${fmt(x.created)}</td><td><button class="btn small" data-del="${esc(x.code)}">Delete</button></td></tr>`; }).join("")}</table></div>` : `<p class="hint">No codes yet.</p>`;
+  body.innerHTML = `<div class="card" style="margin-bottom:1rem"><h2>Course exam access</h2><p class="hint">Practice, lessons, Calc Lab and flashcards are always free. The verified university module exam (e.g. Portsmouth) is always free for verified students. This setting only controls the AI &amp; ML course exam.</p>
+  <form id="f-excfg" novalidate><label class="chk"><input type="checkbox" id="ec-lock" ${c.lock ? "checked" : ""}> Students need a code (or a grant from you) to take the course exam</label>
+  ${field("ec-price","Price shown","text",'maxlength="20" placeholder="£3"')}
+  <div class="field"><label for="ec-how">How to pay / get a code (shown on the lock screen to logged-in students)</label><textarea id="ec-how" rows="4" maxlength="600" placeholder="e.g. Pay £3 at [your payment link], then WhatsApp your payment reference to the organiser and you'll get a code."></textarea></div>
+  <div id="ec-msg"></div><button class="btn primary" type="submit">Save settings</button></form></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Create a coupon code</h2><form id="f-cp" novalidate><div class="cp-grid">
+  ${field("cp-code","Code (leave blank to generate)","text",'maxlength="24" placeholder="e.g. WELCOME" autocapitalize="characters"')}
+  ${field("cp-uses","How many students can use it","number",'min="1" max="1000" value="1"')}
+  ${field("cp-days","Expires after (days, 0 = never)","number",'min="0" max="365" value="0"')}
+  ${field("cp-note","Note (only you see it)","text",'maxlength="80" placeholder="e.g. Paid by Rahul, UPI ref 1234"')}</div>
+  <div id="cp-msg"></div><button class="btn primary" type="submit">Create code</button></form></div>
+  <div class="card"><h2>Codes</h2><div id="cp-list">${list(d.coupons || [])}</div><p class="hint">You can also unlock a student directly with <b>Grant exam</b> in Overview → Students.</p></div>`;
+  $("#ec-price").value = c.price || "£3"; $("#ec-how").value = c.how || "";
+  $("#f-excfg").onsubmit = async e => { e.preventDefault(); await busy(e.target.querySelector("button[type=submit]"), "Saving…", async () => {
+    const r = await api("adminSetExamConfig", { key, lock:$("#ec-lock").checked, price:$("#ec-price").value.trim(), how:$("#ec-how").value });
+    $("#ec-msg").innerHTML = r.ok ? `<div class="feedback ok">Saved. Students see the change within a few minutes.</div>` : `<div class="feedback no">${esc(errMsg(r.error))}</div>`;
+    if (r.ok) { CONFIG = { ...(CONFIG || {}), exam:r.exam }; _rawSet("idta-config", CONFIG); }
+  }); };
+  const bindList = () => {
+    $("#cp-list").querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast("Copied " + b.dataset.copy); } catch (e) { toast(b.dataset.copy); } });
+    $("#cp-list").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Click to confirm"; return; }
+      await busy(b, "Deleting…", async () => { const r = await api("adminDeleteCoupon", { key, code:b.dataset.del }); if (!r.ok) return toast(errMsg(r.error)); $("#cp-list").innerHTML = list(r.coupons || []); bindList(); });
+    });
+  };
+  bindList();
+  $("#f-cp").onsubmit = async e => { e.preventDefault(); await busy(e.target.querySelector("button[type=submit]"), "Creating…", async () => {
+    const r = await api("adminCreateCoupon", { key, code:$("#cp-code").value.trim(), uses:+$("#cp-uses").value || 1, days:+$("#cp-days").value || 0, note:$("#cp-note").value.trim() });
+    if (!r.ok) { $("#cp-msg").innerHTML = `<div class="feedback no">${esc(errMsg(r.error))}</div>`; return; }
+    $("#cp-msg").innerHTML = `<div class="feedback ok"><b>Code created: <code>${esc(r.code)}</code></b>Send it to the student. They enter it on the Mock exam tab.</div>`;
+    $("#cp-code").value = ""; $("#cp-note").value = ""; $("#cp-list").innerHTML = list(r.coupons || []); bindList();
+  }); };
 }
 async function adminNews() {
   const body = $("#ad-body");
@@ -1755,7 +1841,7 @@ async function authBoot() {
   if (!AUTH.get()) { if (location.hash === "#admin") { lock(false); return; } authMode = "login"; authRender(); lock(true); return; }
   lock(false);
   const r = await api("me", { token:AUTH.token() }, { retries:1 });
-  if (r.ok) { AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); }
+  if (r.ok) { AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); if (MK.state === "intro") mockRender(); }
   else if (r.error === "auth") sessionExpired();
   // network errors: keep working offline with the saved login; queued activity is sent later
 }
@@ -2384,7 +2470,7 @@ function uniPackRender() {
   <div id="uni-notes"></div>`;
   root.querySelectorAll("[data-syl]").forEach(b => b.onclick = () => { show("practice"); pStart("pack:" + b.dataset.syl); });
   if (PACK.notes) { $("#uni-notes").innerHTML = PACK.notes; initNoteSearch(); }
-  if ($("#uv-mock")) $("#uv-mock").onclick = () => { show("mock"); startMock(ex.n, ex.minutes); };
+  if ($("#uv-mock")) $("#uv-mock").onclick = () => { MK.mode = "pack"; MK.chosen = true; show("mock"); startMock(ex.n, ex.minutes); };
   if ($("#uv-sample")) $("#uv-sample").onclick = () => { show("practice"); pStart("sample"); };
   $("#uv-all").onclick = () => { show("practice"); pStart("pack"); };
 }
