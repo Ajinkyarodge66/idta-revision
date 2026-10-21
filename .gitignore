@@ -1,0 +1,4 @@
+# Private university packs: never commit
+Pack.gs
+private/
+packs.json

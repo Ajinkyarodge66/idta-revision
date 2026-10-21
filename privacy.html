@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · IDTA Revision</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#f3f5f8;--surface:#fff;--ink:#18222f;--muted:#5a6778;--line:#d9dfe7;--accent:#1d5c8c}
+@media (prefers-color-scheme:dark){:root{--bg:#10161e;--surface:#18212c;--ink:#e6ebf1;--muted:#9aa7b7;--line:#2b3746;--accent:#6fb0e6;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:44rem;margin:0 auto;padding:2rem max(16px,env(safe-area-inset-left)) 4rem}
+h1,h2{font-family:"Source Serif 4",Georgia,serif;line-height:1.2}
+h1{font-size:2rem;margin:.5rem 0 1rem}
+h2{font-size:1.2rem;margin:1.8rem 0 .4rem}
+a{color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<p><a href="./">← Back to IDTA Revision</a></p>
+<h1>Privacy notice</h1>
+<p class="muted">IDTA Revision is an unofficial, student-made study app for the Intelligent Data &amp; Text Analytics module. It is run by the class organiser (the person who shared the link with you), not by the university.</p>
+
+<h2>What we store</h2>
+<table>
+<tr><th>Data</th><th>Why</th></tr>
+<tr><td>Name, mobile number, email, university, course</td><td>To create your account, log you in with your mobile number, email you password-reset codes, and show your name and course on the leaderboard if you choose</td></tr>
+<tr><td>Password</td><td>Never stored. Your browser scrambles it (PBKDF2, 150,000 rounds) and the server stores only a salted hash of that, which can't be turned back into your password</td></tr>
+<tr><td>Quiz activity: which questions you answered, right or wrong, topic, mock scores, Calc Lab attempts</td><td>To back up your progress across devices, run the leaderboard, and show the organiser which topics the class finds hard</td></tr>
+<tr><td>Saved progress (mistakes list, must-know ticks, mock history)</td><td>To restore your progress when you log in on another device</td></tr>
+</table>
+
+<h2>Where it's stored</h2>
+<p>In a private Google Sheet owned by the class organiser, accessed through Google Apps Script. Only the organiser can open it. Nothing is sold, shared with third parties or used for advertising. The app has no trackers or analytics.</p>
+
+<h2>Who can see what</h2>
+<ul>
+<li><b>Other students</b> see only your name, course and scores on the leaderboard, and only if you leave "Show me on the leaderboard" switched on.</li>
+<li><b>The organiser</b> can see your account details and activity in order to run the app.</li>
+</ul>
+
+<h2>Your choices</h2>
+<ul>
+<li>Hide yourself from the leaderboard at any time in the <b>Account</b> tab.</li>
+<li><b>Delete your account</b> in the Account tab. This permanently removes your details, saved progress and all your activity.</li>
+<li>Questions or requests: contact the class organiser, or <a href="https://github.com/Ajinkyarodge66/idta-revision/issues" target="_blank" rel="noopener">open an issue</a> without including personal details.</li>
+</ul>
+
+<h2>How long we keep it</h2>
+<p>Until you delete your account, or until the organiser deletes all data after the module ends.</p>
+
+<h2>On your device</h2>
+<p>The app saves your login and progress in your browser's local storage so it works offline. Logging out or deleting your account clears it from that device.</p>
+</main>
+</body>
+</html>

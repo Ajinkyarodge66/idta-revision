@@ -1,0 +1,15 @@
+{
+  "name": "IDTA Exam Revision",
+  "short_name": "IDTA Revision",
+  "description": "Cheat sheet, practice questions, Calc Lab, timed mock exams and flashcards for IDTA Part 1.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f8",
+  "theme_color": "#1d5c8c",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}
