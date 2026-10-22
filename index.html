@@ -386,6 +386,24 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
 .ref-link input{flex:1 1 16rem;min-width:0;font:inherit;font-family:var(--f-mono);font-size:.88rem;padding:.55rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 td.neg{color:var(--bad)}
+/* ---- analytics ---- */
+.funnel{display:flex;flex-direction:column;gap:.55rem;margin:.6rem 0}
+.fn-row{display:grid;grid-template-columns:minmax(9rem,13rem) 1fr 7rem;gap:.8rem;align-items:center}
+.fn-l b{display:block}.fn-l span{font-size:.8rem;color:var(--muted)}
+.fn-track{height:14px;background:var(--line);border-radius:4px;overflow:hidden}.fn-track span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.fn-v{text-align:right;font-variant-numeric:tabular-nums}.fn-v b{display:block;font-size:1.1rem}.fn-v span{font-size:.78rem;color:var(--muted)}
+.mini-grid4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.mini-chart{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem}
+.mini-chart figcaption{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem}.mini-chart figcaption span{font-size:.85rem;color:var(--muted)}.mini-chart figcaption b{font-family:var(--f-display);font-size:1.3rem}.mini-chart figcaption small{font-family:var(--f-body);font-size:.75rem;color:var(--muted);font-weight:400}
+.mini-chart svg{display:block;width:100%;height:auto}.mb-bar{fill:var(--accent)}.mb:hover .mb-bar{fill:var(--ink)}
+.dev-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;margin-top:1rem}.dev-cols h3{margin:0 0 .4rem;font-size:1rem}
+.stu-head .stu-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem}.stu-head .badge{background:var(--code-bg);color:var(--ink)}.stu-head .badge.ok{background:var(--good-soft);color:var(--good)}
+.big.sm{font-size:1.15rem}
+.heat{display:grid;grid-template-columns:repeat(30,minmax(0,1fr));gap:3px}
+.hs{aspect-ratio:1;border-radius:3px;background:var(--line)}.hs.l1{background:color-mix(in srgb,var(--accent) 35%,var(--surface))}.hs.l2{background:color-mix(in srgb,var(--accent) 65%,var(--surface))}.hs.l3{background:var(--accent)}
+.timeline{list-style:none;margin:0;padding:0}.timeline li{display:grid;grid-template-columns:8.5rem 1fr;gap:.8rem;padding:.45rem 0;border-bottom:1px solid var(--line)}.timeline li:last-child{border-bottom:0}.timeline span{color:var(--muted)}
+ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
+@media (max-width:760px){.mini-grid4,.dev-cols{grid-template-columns:1fr}.fn-row{grid-template-columns:1fr 5.5rem}.fn-track{grid-column:1/-1;grid-row:2}.timeline li{grid-template-columns:1fr}}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -831,8 +849,18 @@ const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const shuffle = a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const store = {get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-// Referral links look like …/?ref=1A2B3C4D. Remember the code until sign-up, then tidy the address bar.
-(function(){const m=location.search.match(/[?&]ref=([0-9A-Fa-f]{8})\b/);if(m){store.set("idta-ref",m[1].toUpperCase());try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}}})();
+// Where did this visit come from? ?src= / utm_source= tags, a referral link, or the referring site.
+function trafficSource(){
+  const q=new URLSearchParams(location.search);let s=q.get("src")||q.get("utm_source")||"";
+  if(!s&&/[?&]ref=/.test(location.search))s="referral";
+  if(!s&&document.referrer){try{const h=new URL(document.referrer).hostname.replace(/^(www|m|l|lm)\./,"");if(h&&h!==location.hostname)s=/whatsapp/.test(h)?"whatsapp":/linkedin|lnkd/.test(h)?"linkedin":/instagram/.test(h)?"instagram":/facebook|fb\./.test(h)?"facebook":/google\./.test(h)?"google":/^t\.co$|twitter|x\.com/.test(h)?"x":/reddit/.test(h)?"reddit":/youtube/.test(h)?"youtube":/telegram|t\.me/.test(h)?"telegram":/teams|outlook|office/.test(h)?"microsoft":h}catch(e){}}
+  return s.toLowerCase().replace(/[^a-z0-9._-]/g,"").slice(0,40);
+}
+function deviceKind(){try{const w=Math.min(screen.width,screen.height),coarse=matchMedia("(pointer:coarse)").matches;return coarse&&w<600?"phone":coarse?"tablet":"desktop"}catch(e){return "desktop"}}
+// Referral links look like …/?ref=1A2B3C4D. Remember the code (and the first source) until sign-up, then tidy the address bar.
+(function(){const src=trafficSource();window.__src=src;if(src&&!store.get("idta-src",""))store.set("idta-src",src);
+  const m=location.search.match(/[?&]ref=([0-9A-Fa-f]{8})\b/);if(m)store.set("idta-ref",m[1].toUpperCase());
+  if(/[?&](ref|src|utm_[a-z]+)=/.test(location.search)){try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}}})();
 const TYPELABEL = {single:"Multiple choice · single answer",multi:"Multiple response · select all that apply",match:"Matching"};
 Q.forEach((q,i)=>q.id=i);
 
@@ -1016,7 +1044,7 @@ function coachHTML(){
   const days=store.get("idta-days",{}),goal=+store.get("idta-goal",20)||20,today=days[dayKey()]||0,streak=streakOf(days),due=dueIds().length;
   const h=store.get("idta-hist",{}),per={};Object.keys(h).forEach(id=>{if(!Q[id])return;const t=Q[id].t;per[t]=per[t]||[0,0];per[t][0]+=h[id][0];per[t][1]+=h[id][1]});
   const weak=Object.keys(per).filter(t=>TOPICS[t]&&per[t][1]>=3).sort((a,b)=>per[a][0]/per[a][1]-per[b][0]/per[b][1])[0];
-  const ex=store.get("idta-examdate","")||"",left=ex?Math.ceil((new Date(ex+"T09:00").getTime()-Date.now())/864e5):null;
+  const ex=store.get("idta-examdate","")||"",left=ex?Math.round((new Date(ex+"T12:00").getTime()-new Date(dayKey()+"T12:00").getTime())/864e5):null;
   const unseen=Q.filter(q=>q&&!h[q.id]).length,perDay=left>0?Math.ceil(unseen/left):0;
   const head=today>=goal?"Daily goal done. Nice work!":due?`Start with your ${due} review${due>1?"s":""}`:today?"Keep going":"Ready when you are";
   return `<section class="coach card" aria-label="Study coach">
@@ -1672,7 +1700,7 @@ function authRender(msg) {
       const lb = $("#su-lb").checked;
       await busy(e.target.querySelector("button[type=submit]"), "Creating account…", async () => {
         let d; try { d = await derivePw(pw, mobile); } catch (x) { return authMsg({ text:ERR.no_crypto }); }
-        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true, ref:store.get("idta-ref", "") });
+        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true, ref:store.get("idta-ref", ""), src:store.get("idta-src", ""), dev:deviceKind() });
         if (!r.ok) return authMsg({ text:errMsg(r.error) });
         try { localStorage.removeItem("idta-ref"); } catch (x) {}
         signInDone(r, "Account created. Welcome, " + r.profile.name + "!");
@@ -1954,7 +1982,7 @@ async function adminRender() {
     };
     return;
   }
-  const tabs = [["overview","Overview"],["exam","Exam & coupons"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
+  const tabs = [["overview","Overview"],["analytics","Analytics"],["exam","Exam & coupons"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
   root.innerHTML = `<div class="filters" role="tablist" aria-label="Admin sections" style="margin-bottom:1rem">${tabs.map(([k, l]) => `<button aria-pressed="${AD.tab === k}" data-t="${k}">${l}</button>`).join("")}<button id="ad-out" style="margin-left:auto">Sign out of admin</button></div><div id="ad-body"><p class="hint">Loading…</p></div>`;
   root.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { AD.tab = b.dataset.t; adminRender(); });
   if (AD.tab !== "exam") Promise.all([api("adminPayments", { key }, { retries:0 }), api("adminRefunds", { key }, { retries:0 }), api("adminReferrals", { key }, { retries:0 })]).then(([pm, rq, rr]) => { AD.other = (rq.ok ? rq.pending.length : 0) + (rr.ok ? rr.pending.length : 0); if (pm.ok) { payTabBadge(pm.pending.length); AD.payIds = pm.pending.map(p => p.id).join(); } });
@@ -1963,6 +1991,7 @@ async function adminRender() {
   if (AD.tab === "questions") return adminQuestions();
   if (AD.tab === "unis") return adminUnis();
   if (AD.tab === "exam") return adminExam();
+  if (AD.tab === "analytics") return adminAnalytics();
   const d = await api("admin", { key });
   if (!d.ok) {
     if (d.error === "bad_key") { store.set("idta-admin-key", ""); syncTabs(); return adminRender(); }
@@ -1984,7 +2013,7 @@ function adminOverview(d) {
   $("#ad-body").innerHTML = `<div class="qnav" style="justify-content:flex-start;gap:.5rem;margin-top:0"><button class="btn" id="ad-refresh">Refresh</button><span class="hint">${d.rows} activity rows · student details are personal data, so keep them private</span></div>
   <div class="tiles"><div class="tile"><div class="label">Accounts</div><div class="big">${users.length}</div><div class="sub">${users.filter(u => u.lb).length} on leaderboard</div></div><div class="tile"><div class="label">Active</div><div class="big">${users.filter(u => u.last > dayAgo).length}</div><div class="sub">last 24 h · ${users.filter(u => u.last > weekAgo).length} this week</div></div><div class="tile"><div class="label">Class accuracy</div><div class="big">${totQ ? Math.round(totR / totQ * 100) + "%" : "–"}</div><div class="sub">${totQ} answers · ${totM} mocks</div></div></div>
   <div class="search" style="margin-top:.5rem"><input type="search" id="ad-filter" placeholder="Filter students by name, mobile, email, university or course" aria-label="Filter students"><span class="score" id="ad-count"></span></div>
-  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Exam</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td>${esc(u.name)}</td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${u.examAccess ? `<span class="badge ok" title="${esc(u.examAccess)}">✓ Unlocked</span> <button class="btn small" data-exam="${esc(u.id)}" data-on="">Remove</button>` : `<span class="nowrap"><button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="${priceNum()}">Paid ${esc(priceTxt())}</button> <button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="0">Free</button></span>`}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Exam</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td><button class="linkbtn" data-stu="${esc(u.id)}">${esc(u.name)}</button></td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${u.examAccess ? `<span class="badge ok" title="${esc(u.examAccess)}">✓ Unlocked</span> <button class="btn small" data-exam="${esc(u.id)}" data-on="">Remove</button>` : `<span class="nowrap"><button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="${priceNum()}">Paid ${esc(priceTxt())}</button> <button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="0">Free</button></span>`}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
   ${users.length ? `<div class="card" style="margin-bottom:1rem"><h2>Students by course</h2><div class="bars">${Object.keys(byCourse).sort((a, b) => byCourse[b] - byCourse[a]).map(k => `<div class="bar"><span>${esc(k)}</span><span class="track"><span class="fill" style="display:block;width:${byCourse[k] / users.length * 100}%"></span></span><span class="v">${byCourse[k]}</span></div>`).join("")}</div></div>` : ""}
   ${tp.length ? `<div class="card" style="margin-bottom:1rem"><h2>Topic accuracy (whole class)</h2><div class="bars">${tp.map(t => `<div class="bar"><span>${esc(TOPICS[t.k])}</span><span class="track"><span class="fill" style="display:block;width:${t.r / t.n * 100}%;background:${t.r / t.n >= .85 ? "var(--good)" : t.r / t.n >= .6 ? "var(--accent)" : "var(--bad)"}"></span></span><span class="v">${Math.round(t.r / t.n * 100)}% · ${t.n}</span></div>`).join("")}</div></div>` : ""}
   ${hard.length ? `<div class="card" style="margin-bottom:1rem"><h2>Hardest questions</h2><p class="hint">Lowest class accuracy, minimum 3 attempts. Good candidates to go over together, or to fix if the wording is unclear.</p><div class="tbl"><table><tr><th>Accuracy</th><th>Question</th><th>Topic</th></tr>${hard.map(x => `<tr><td class="num">${Math.round(x.r / x.n * 100)}% (${x.r}/${x.n})</td><td>${esc(Q[x.id].p.length > 120 ? Q[x.id].p.slice(0, 120) + "…" : Q[x.id].p)}</td><td>${esc(TOPICS[Q[x.id].t])}</td></tr>`).join("")}</table></div></div>` : ""}
@@ -1998,6 +2027,7 @@ function adminOverview(d) {
       toast(b.dataset.uni ? "Access granted." : "Access removed. They lose the private pack next time they open the app."); adminRender();
     });
   });
+  $("#ad-table").querySelectorAll("[data-stu]").forEach(b => b.onclick = () => adminStudentView(b.dataset.stu));
   $("#ad-table").querySelectorAll("[data-exam]").forEach(b => b.onclick = async () => {
     if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = b.dataset.on ? "Click to confirm" : "Click to confirm remove"; return; }
     await busy(b, "Saving…", async () => {
@@ -2110,6 +2140,70 @@ setInterval(async () => {
     const q = $("#pay-queue"); if (q && !q.querySelector(".pay-img img") && document.activeElement && !q.contains(document.activeElement)) { q.innerHTML = payQueueHTML(pm); bindPayQueue(); }
   }
 }, 30000);
+/* ---------- analytics (first-party counts from your own sheet) ---------- */
+const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+function miniBars(title, keys, vals, unit, avg) {
+  const W = 300, H = 90, n = vals.length, bw = W / n, mx = Math.max(1, ...vals), tot = vals.reduce((a, b) => a + b, 0);
+  const fmtD = k => new Date(k + "T12:00").toLocaleDateString([], { day:"numeric", month:"short" });
+  return `<figure class="mini-chart"><figcaption><span>${esc(title)}</span><b>${avg ? (Math.round(tot / n * 10) / 10) + "<small> avg/day</small>" : tot}</b></figcaption><svg viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="${esc(title)}: ${tot} in total">${vals.map((v, i) => { const h = v / mx * (H - 6); return `<g class="mb"><rect x="${(i * bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}" fill="transparent"><title>${fmtD(keys[i])}: ${v} ${unit}</title></rect><rect class="mb-bar" x="${(i * bw + Math.min(1, bw * .15)).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${Math.max(1, bw - Math.min(2, bw * .3)).toFixed(1)}" height="${h.toFixed(1)}" rx="${bw > 6 ? 2 : 0}"><title>${fmtD(keys[i])}: ${v} ${unit}</title></rect></g>`; }).join("")}<line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="var(--line)"/><text x="0" y="${H + 13}" font-size="10" fill="var(--muted)">${fmtD(keys[0])}</text><text x="${W}" y="${H + 13}" font-size="10" fill="var(--muted)" text-anchor="end">Today</text></svg></figure>`;
+}
+async function adminAnalytics() {
+  const key = store.get("idta-admin-key", ""), body = $("#ad-body"), days = AD.range || 30;
+  const a = await api("adminAnalytics", { key, days });
+  if (!a.ok) { body.innerHTML = `<p class="hint">${a.error === "unknown_action" ? "Update Code.gs in Apps Script to see analytics." : esc(errMsg(a.error))}</p>`; return; }
+  const f = a.funnel, steps = [["Visitors", f.visits, "logged-out visits to the site"], ["Signed up", f.signups, "created an account"], ["Studied", f.studied, "answered at least one question"], ["Unlocked exams", f.unlocked, "paid or used a code"], ["Took an exam", f.exams, "finished a mock or exam"], ["Got a certificate", f.certs, "passed with 70%+"]];
+  const top = Math.max(1, ...steps.map(x => x[1]));
+  const e = a.engagement, r = a.retention, devRow = o => { const t = Object.values(o).reduce((s, x) => s + x, 0); return ["phone", "tablet", "desktop", "unknown"].filter(k => o[k]).map(k => `<div class="bar"><span>${{ phone:"📱 Phone", tablet:"Tablet", desktop:"💻 Laptop / desktop", unknown:"Unknown" }[k]}</span><span class="track"><span class="fill" style="display:block;width:${o[k] / t * 100}%"></span></span><span class="v">${o[k]} · ${pct(o[k], t)}</span></div>`).join("") || `<p class="hint">No data yet.</p>`; };
+  body.innerHTML = `<div class="filters" role="group" aria-label="Time range" style="margin-bottom:1rem">${[7, 30, 90, 365].map(d => `<button aria-pressed="${d === days}" data-range="${d}">${d === 365 ? "12 months" : "Last " + d + " days"}</button>`).join("")}</div>
+  <div class="card" style="margin-bottom:1rem"><h2>Sign-up funnel</h2><p class="hint">People who signed up in this period and how far they got. Visitors are counted once per browser session, without cookies or IDs.</p>
+  <div class="funnel">${steps.map((x, i) => `<div class="fn-row"><div class="fn-l"><b>${x[0]}</b><span>${x[2]}</span></div><div class="fn-track"><span style="width:${Math.max(x[1] ? 1.5 : 0, x[1] / top * 100)}%"></span></div><div class="fn-v"><b>${x[1]}</b>${i && steps[i - 1][1] ? `<span>${pct(x[1], steps[i - 1][1])} of previous</span>` : ""}</div></div>`).join("")}</div>
+  <p class="hint">Visitor → sign-up: <b>${pct(f.signups, f.visits)}</b> · sign-up → paid: <b>${pct(f.unlocked, f.signups)}</b></p></div>
+  <div class="mini-grid4">${miniBars("Visitors per day", a.keys, a.daily.visits, "visitors")}${miniBars("Sign-ups per day", a.keys, a.daily.signups, "sign-ups")}${miniBars("Active students per day", a.keys, a.daily.active, "active students", true)}${miniBars("Exam unlocks per day", a.keys, a.daily.unlocks, "unlocks")}</div>
+  <div class="card" style="margin:1rem 0"><h2>Where students come from</h2>${a.sources.length ? `<div class="tbl"><table><tr><th>Source</th><th>Visitors</th><th>Sign-ups</th><th>Visit → sign-up</th><th>Unlocked</th><th>Revenue</th></tr>${a.sources.map(x => `<tr><td>${esc(x.src)}</td><td class="num">${x.visits}</td><td class="num">${x.signups}</td><td class="num">${pct(x.signups, x.visits)}</td><td class="num">${x.unlocked}</td><td class="num">${x.revenue ? money(x.revenue) : "–"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No visits recorded yet.</p>`}
+  <p class="hint">WhatsApp and some apps don't say where a visitor came from, so they show as <b>direct</b>. Use tagged links to tell your groups apart:</p>
+  <div class="ref-link"><input id="an-tag" maxlength="30" placeholder="e.g. msc-ai-whatsapp" aria-label="Name for a tracked link"><input id="an-link" readonly aria-label="Tracked link" value="${esc(SHARE_URL)}?src=…"><button class="btn" id="an-copy">Copy link</button></div></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Engagement</h2><div class="tiles"><div class="tile"><div class="label">Active today</div><div class="big">${e.dau}</div><div class="sub">studied in the last 24 h</div></div><div class="tile"><div class="label">This week</div><div class="big">${e.wau}</div><div class="sub">last 7 days</div></div><div class="tile"><div class="label">This month</div><div class="big">${e.mau}</div><div class="sub">last 30 days</div></div><div class="tile"><div class="label">Study days</div><div class="big">${e.avgDays}</div><div class="sub">average per active student</div></div><div class="tile"><div class="label">Study time</div><div class="big">${e.avgMinutes} min</div><div class="sub">average per active student (estimate)</div></div></div>
+  <div class="dev-cols"><div><h3>Sign-ups by device</h3><div class="bars">${devRow(a.devices.signups)}</div></div><div><h3>Visits by device</h3><div class="bars">${devRow(a.devices.visits)}</div></div></div></div>
+  <div class="card"><h2>Retention</h2><p class="hint">Of students who signed up long enough ago, the share who studied again after…</p><div class="tiles">${[["1 day", r.d1], ["7 days", r.d7], ["30 days", r.d30]].map(([l, x]) => `<div class="tile"><div class="label">After ${l}</div><div class="big">${pct(x.back, x.pool)}</div><div class="sub">${x.back} of ${x.pool} students</div></div>`).join("")}</div></div>`;
+  body.querySelectorAll("[data-range]").forEach(b => b.onclick = () => { AD.range = +b.dataset.range; adminAnalytics(); });
+  const tagLink = () => { const t = $("#an-tag").value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, ""); $("#an-link").value = SHARE_URL + "?src=" + (t || "…"); return t; };
+  $("#an-tag").oninput = tagLink;
+  $("#an-copy").onclick = async () => { if (!tagLink()) return toast("Type a name for the link first."); try { await navigator.clipboard.writeText($("#an-link").value); toast("Tracked link copied."); } catch (x) { $("#an-link").select(); } };
+}
+
+/* ---------- per-student tracker ---------- */
+async function adminStudentView(id) {
+  const key = store.get("idta-admin-key", ""), body = $("#ad-body");
+  body.innerHTML = `<p class="hint">Loading student…</p>`;
+  const d = await api("adminStudent", { key, id });
+  if (!d.ok) { body.innerHTML = `<button class="btn" id="st-back">← All students</button><p class="hint">${esc(errMsg(d.error))}</p>`; $("#st-back").onclick = adminRender; return; }
+  const p = d.profile, ev = d.events.slice().sort((a, b) => a.ts - b.ts), qs = ev.filter(x => x.ev === "q"), mocks = ev.filter(x => x.ev === "mock"), labs = ev.filter(x => x.ev === "lab");
+  const dk = t => dayKey(t), byDay = {}; ev.forEach(x => { (byDay[dk(x.ts)] = byDay[dk(x.ts)] || []).push(x); });
+  const studyDays = Object.keys(byDay).filter(k => byDay[k].some(x => x.ev === "q" || x.ev === "mock" || x.ev === "lab"));
+  const last = ev.length ? ev[ev.length - 1].ts : 0, right = qs.filter(x => x.ok === 1).length;
+  const per = {}; qs.forEach(x => { if (!x.topic) return; per[x.topic] = per[x.topic] || [0, 0]; per[x.topic][1]++; if (x.ok === 1) per[x.topic][0]++; });
+  const strip = [...Array(30)].map((_, i) => { const t = Date.now() - (29 - i) * 864e5, k = dk(t), n = (byDay[k] || []).filter(x => x.ev === "q" || x.ev === "lab" || x.ev === "mock").length; return `<span class="hs l${n ? n < 10 ? 1 : n < 30 ? 2 : 3 : 0}" title="${new Date(t).toLocaleDateString([], { weekday:"short", day:"numeric", month:"short" })}: ${n} answer${n === 1 ? "" : "s"}"></span>`; }).join("");
+  const fmt = s => { const t = new Date(s); return s && !isNaN(t) ? t.toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" }) : "–"; };
+  const special = { unlock:x => `🔓 Unlocked course exams (${x.s ? money(+x.s) : "free"}${x.k ? ", " + esc(x.k) : ""})`, revoke:x => `🔒 Exam access removed${x.k ? " (" + esc(x.k) + ")" : ""}`, refund:x => `↩️ Refunded ${money(+x.s)}`, payout:x => `🎁 Referral reward ${money(+x.s)} paid`, restore:() => "🔓 Exam access restored" };
+  const timeline = Object.keys(byDay).sort().reverse().slice(0, 21).map(k => { const xs = byDay[k], q = xs.filter(x => x.ev === "q"), m = xs.filter(x => x.ev === "mock"), l = xs.filter(x => x.ev === "lab"), sp = xs.filter(x => special[x.ev]);
+    const parts = []; if (q.length) parts.push(`${q.length} question${q.length > 1 ? "s" : ""} (${pct(q.filter(x => x.ok === 1).length, q.length)} right${q.length ? ", " + [...new Set(q.map(x => TOPICS[x.topic]).filter(Boolean))].slice(0, 3).join(", ") : ""})`);
+    m.forEach(x => parts.push(`📝 Exam ${x.s}/${x.n}`)); if (l.length) parts.push(`🧮 Calc Lab ${l.filter(x => x.ok === 1).length}/${l.length}`); sp.forEach(x => parts.push(special[x.ev](x)));
+    return `<li><b>${new Date(k + "T12:00").toLocaleDateString([], { weekday:"short", day:"numeric", month:"short" })}</b><span>${parts.join(" · ")}</span></li>`; }).join("");
+  const rf = d.referrals;
+  body.innerHTML = `<button class="btn" id="st-back">← All students</button>
+  <div class="card stu-head" style="margin:1rem 0"><div><h1 style="margin:0 0 .3rem">${esc(p.name)}</h1><p class="hint" style="margin:0">+${esc(p.mobile)} · ${esc(p.email)} · ${esc(p.university)} · ${esc(p.course)}</p>
+    <div class="stu-tags">${p.verifiedUni ? `<span class="badge ok">✓ ${esc(p.verifiedUni)}</span>` : ""}${p.exam ? `<span class="badge ok">Exams unlocked</span>` : `<span class="badge">Exams locked</span>`}${p.examUsed ? `<span class="badge">Started an exam ${fmt(p.examUsed)}</span>` : ""}<span class="badge">Source: ${esc(p.src || "unknown")}</span><span class="badge">${esc(p.dev || "unknown device")}</span>${p.referredBy ? `<span class="badge">Invited by ${esc(p.referredBy)}</span>` : ""}</div></div></div>
+  <div class="tiles"><div class="tile"><div class="label">Joined</div><div class="big sm">${fmt(p.created)}</div><div class="sub">last active ${last ? ago(last) : "never"}</div></div><div class="tile"><div class="label">Study days</div><div class="big">${studyDays.length}</div><div class="sub">different days with activity</div></div><div class="tile"><div class="label">Questions</div><div class="big">${qs.length}</div><div class="sub">${pct(right, qs.length)} correct</div></div><div class="tile"><div class="label">Exams</div><div class="big">${mocks.length}</div><div class="sub">${mocks.length ? "best " + Math.max(...mocks.map(x => +x.s)) + "/" + mocks[0].n : "none yet"}</div></div><div class="tile"><div class="label">Lessons</div><div class="big">${d.lessons}</div><div class="sub">completed · ${d.mustTicked} must-know ticked</div></div><div class="tile"><div class="label">Calc Lab</div><div class="big">${labs.length}</div><div class="sub">${pct(labs.filter(x => x.ok === 1).length, labs.length)} fully right</div></div></div>
+  <div class="card" style="margin:1rem 0"><h2>Last 30 days</h2><div class="heat" aria-label="Activity per day for the last 30 days">${strip}</div><p class="hint" style="margin-bottom:0">Darker = more answers that day.${d.examDate ? ` Exam date set: <b>${esc(d.examDate)}</b>.` : ""}${d.goal ? ` Daily goal: ${d.goal}.` : ""}</p></div>
+  ${Object.keys(per).length ? `<div class="card" style="margin-bottom:1rem"><h2>Accuracy by topic</h2><div class="bars">${Object.keys(per).sort((a, b) => per[a][0] / per[a][1] - per[b][0] / per[b][1]).map(t => `<div class="bar"><span>${esc(TOPICS[t] || t)}</span><span class="track"><span class="fill" style="display:block;width:${per[t][0] / per[t][1] * 100}%"></span></span><span class="v">${per[t][0]}/${per[t][1]}</span></div>`).join("")}</div></div>` : ""}
+  <div class="card" style="margin-bottom:1rem"><h2>Timeline</h2>${timeline ? `<ul class="timeline">${timeline}</ul>` : `<p class="hint">No activity yet.</p>`}</div>
+  <div class="card"><h2>Money &amp; rewards</h2><ul class="plain">
+    <li>Payments uploaded: ${d.payments.length ? d.payments.map(x => `${fmt(x.at)} (${x.status})`).join(", ") : "none"}</li>
+    <li>Refunds: ${d.refunds.length ? d.refunds.map(x => `${money(x.amount)} ${x.status} ${fmt(x.at)}`).join(", ") : "none"}</li>
+    <li>Certificates: ${d.certs.length ? d.certs.map(x => `${esc(x.exam)} ${x.score}/${x.n} (${esc(x.id)})`).join(", ") : "none"}</li>
+    <li>Referrals: ${rf.friends.length} friend${rf.friends.length === 1 ? "" : "s"} joined, ${rf.qualified} qualified, earned ${money(rf.earned)}, paid ${money(rf.paidOut)}</li></ul></div>`;
+  $("#st-back").onclick = adminRender;
+}
 async function adminExam() {
   const key = store.get("idta-admin-key", ""), body = $("#ad-body");
   const [d, sl, pm, rq, rr] = await Promise.all([api("adminCoupons", { key }), api("adminSales", { key }), api("adminPayments", { key }), api("adminRefunds", { key }), api("adminReferrals", { key })]);
@@ -2305,7 +2399,7 @@ async function authBoot() {
   if (!AUTH.get()) { if (location.hash === "#admin") { lock(false); return; } authMode = "login"; authRender(); lock(true); return; }
   lock(false);
   const r = await api("me", { token:AUTH.token() }, { retries:1 });
-  if (r.ok) { AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); if (MK.state === "intro") mockRender(); }
+  if (r.ok) { const was = examLocked(); AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); if (MK.state === "intro" && examLocked() !== was) mockRender(); }
   else if (r.error === "auth") sessionExpired();
   // network errors: keep working offline with the saved login; queued activity is sent later
 }
@@ -2334,6 +2428,7 @@ function certRender(){
   if($("#ct-back"))$("#ct-back").onclick=()=>show("stats");
 }
 async function openCert(id){CERT.data=null;show("cert");const r=await api("cert",{id},{retries:1});CERT.data=r.ok?r.cert:{error:1};certRender()}
+if(SYNC_URL&&location.hash!=="#admin"&&!store.get("idta-admin-key","")){try{if(!sessionStorage.getItem("idta-hit")){sessionStorage.setItem("idta-hit","1");api("hit",{src:window.__src||"",dev:deviceKind(),li:!!AUTH.get(),ret:localStorage.getItem("idta-view")!==null},{retries:0})}}catch(e){}}
 const CERT_ID=(location.hash.match(/^#cert=([A-Za-z0-9]{10})$/)||[])[1];
 if(CERT_ID&&SYNC_URL&&!AUTH.get()){document.body.classList.add("certmode");lock(false);openCert(CERT_ID)}
 else{authBoot();if(CERT_ID&&SYNC_URL)openCert(CERT_ID)}
@@ -2872,11 +2967,12 @@ async function loadPack() {
   if (r.error === "auth") return sessionExpired();
   if (r.error === "not_verified") { AUTH.set({ ...AUTH.get(), profile:{ ...p, verifiedUni:"" } }); return loadPack(); }
   if (!r.ok) return;   // offline: keep the cached pack
+  const hadExam = JSON.stringify((PACK && PACK.exam) || null);
   PACK = { uni:r.uni, title:r.title || "", exam:r.exam || null, notes:r.notes || "", questions:r.questions || [], extra:r.extra || [], news:r.news || [] };
   _rawSet("idta-pack", PACK);
   applyConfig(CONFIG || {}); refreshBankViews();
   if (!$("#view-uni").hidden) uniRender();
-  if (MK.state === "intro") mockRender();
+  if (MK.state === "intro" && JSON.stringify(PACK.exam || null) !== hadExam) mockRender();   // only when the exam choice changed, so a half-filled form isn't wiped
 }
 function uniRender() {
   const root = $("#uni-root"), p = uniProfile();

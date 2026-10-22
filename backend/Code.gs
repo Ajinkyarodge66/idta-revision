@@ -11,7 +11,7 @@
  */
 const APP = 'IDTA Revision';
 const SHEETS = {
-  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access', 'Exam first used', 'Referred by'] },
+  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access', 'Exam first used', 'Referred by', 'Source', 'Device'] },
   sessions: { name: 'Sessions', cols: ['Token hash', 'User ID', 'Created', 'Expires'] },
   events:   { name: 'Events',   cols: ['Time', 'User ID', 'Name', 'Event', 'Topic', 'Question', 'Correct', 'Score', 'Out of', 'Detail'] },
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
@@ -20,10 +20,11 @@ const SHEETS = {
   certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] },
   payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] },
   refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note'] },
-  payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] }
+  payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] },
+  visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning'] }
 };
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
-const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22 };
+const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22, src: 23, dev: 24 };
 const REF_REWARD = 1, REF_DAYS = 10;   // £1 per friend who pays and studies on 10 different days
 const DEFAULT_DOMAINS = { 'myport.ac.uk': 'University of Portsmouth', 'port.ac.uk': 'University of Portsmouth' };
 const SESSION_DAYS = 30;
@@ -160,6 +161,8 @@ const API = {
       const row = [id, now_(), name, mobile, email, uni, course, hashPw_(pw, salt), salt, b.lb === false ? 'no' : 'yes', '', '', now_(), '', '', now_()];
       const ref = String(b.ref || '').toUpperCase().replace(/[^0-9A-F]/g, '');
       if (ref.length === 8) { for (let i = 1; i < all.v.length; i++) if (refCode_(all.v[i][U.id]) === ref) { while (row.length < U.refBy) row.push(''); row[U.refBy] = String(all.v[i][U.id]); break; } }
+      while (row.length < U.dev + 1) row.push('');
+      row[U.src] = src_(b.src) || (row[U.refBy] ? 'referral' : 'direct'); row[U.dev] = dev_(b.dev);
       all.sh.appendRow(row);
       cache_().remove('leaderboard');
       return { ok: true, token: newSession_(id), profile: profile_(row), progress: null };
@@ -676,6 +679,82 @@ const API = {
     return { ok: true };
   }),
 
+  /* ----- analytics: first-party counts only, no cookies or third-party trackers ----- */
+  hit: b => {
+    if (tooMany_('hits', 20000)) return { ok: true };   // flood guard
+    bump_('hits', 86400);
+    const sh = sheet_('visits');
+    sh.appendRow([now_(), src_(b.src) || 'direct', dev_(b.dev), b.li ? 'yes' : 'no', b.ret ? 'yes' : 'no']);
+    return { ok: true };
+  },
+  adminAnalytics: b => admin_(b, () => {
+    const days = [7, 30, 90, 365].indexOf(Number(b.days)) >= 0 ? Number(b.days) : 30;
+    const now = Date.now(), from = now - days * 864e5, dayK = t => new Date(t).toISOString().slice(0, 10);
+    const keys = []; for (let i = Math.min(days, 90) - 1; i >= 0; i--) keys.push(dayK(now - i * 864e5));
+    const series = () => { const o = {}; keys.forEach(k => o[k] = 0); return o; };
+    const visits = sheet_('visits').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ t: new Date(r[0]).getTime(), src: String(r[1] || 'direct'), dev: String(r[2] || ''), li: r[3] === 'yes' }));
+    const users = usersAll_().v.slice(1).filter(r => r[U.id]).map(r => ({ id: String(r[U.id]), t: new Date(r[U.created]).getTime(), src: String(r[U.src] || 'unknown'), dev: String(r[U.dev] || 'unknown'), ref: !!r[U.refBy] }));
+    const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => r[1]);
+    const certs = sheet_('certs').getDataRange().getValues().slice(1).filter(r => r[0]);
+    const act = {}, unlockAt = {}, revenue = {}, mockers = {};
+    ev.forEach(r => {
+      const t = new Date(r[0]).getTime(), uid = String(r[1]), e = r[3];
+      if (e === 'q' || e === 'mock' || e === 'lab') (act[uid] = act[uid] || []).push(t);
+      if (e === 'mock') mockers[uid] = Math.min(mockers[uid] || Infinity, t);
+      if (e === 'unlock') { if (!unlockAt[uid]) unlockAt[uid] = t; revenue[uid] = (revenue[uid] || 0) + (Number(r[7]) || 0); }
+      if (e === 'refund' || e === 'payout') revenue[uid] = (revenue[uid] || 0);
+    });
+    // funnel for the period (sign-ups in the period and what they went on to do)
+    const vIn = visits.filter(v => v.t >= from && !v.li), uIn = users.filter(u => u.t >= from), certUids = {};
+    certs.forEach(r => certUids[String(r[2])] = 1);
+    const funnel = { visits: vIn.length, signups: uIn.length, studied: uIn.filter(u => act[u.id]).length, unlocked: uIn.filter(u => unlockAt[u.id]).length, exams: uIn.filter(u => mockers[u.id]).length, certs: uIn.filter(u => certUids[u.id]).length };
+    // daily series
+    const dv = series(), ds = series(), da = series(), du = series();
+    vIn.forEach(v => { const k = dayK(v.t); if (k in dv) dv[k]++; });
+    uIn.forEach(u => { const k = dayK(u.t); if (k in ds) ds[k]++; });
+    const seen = {}; Object.keys(act).forEach(uid => act[uid].forEach(t => { const k = dayK(t); if (k in da && !seen[uid + k]) { seen[uid + k] = 1; da[k]++; } }));
+    Object.keys(unlockAt).forEach(uid => { const k = dayK(unlockAt[uid]); if (k in du) du[k]++; });
+    // sources
+    const src = {};
+    const S = k => src[k] = src[k] || { visits: 0, signups: 0, unlocked: 0, revenue: 0 };
+    vIn.forEach(v => S(v.src).visits++);
+    uIn.forEach(u => { const o = S(u.src); o.signups++; if (unlockAt[u.id]) o.unlocked++; o.revenue += revenue[u.id] || 0; });
+    // engagement
+    const activeSince = since => Object.keys(act).filter(uid => act[uid].some(t => t >= since)).length;
+    const minutes = uid => { const ts = act[uid].filter(t => t >= from).sort((a, b) => a - b); let m = 0; for (let i = 0; i < ts.length; i++) m += i && ts[i] - ts[i - 1] < 30 * 6e4 ? Math.min(5, (ts[i] - ts[i - 1]) / 6e4) : 1; return m; };
+    const activeIn = Object.keys(act).filter(uid => act[uid].some(t => t >= from));
+    const daysOf = uid => Object.keys(act[uid].filter(t => t >= from).reduce((o, t) => (o[dayK(t)] = 1, o), {})).length;
+    const engagement = { dau: activeSince(now - 864e5), wau: activeSince(now - 7 * 864e5), mau: activeSince(now - 30 * 864e5), active: activeIn.length,
+      avgDays: activeIn.length ? Math.round(activeIn.reduce((s, u) => s + daysOf(u), 0) / activeIn.length * 10) / 10 : 0,
+      avgMinutes: activeIn.length ? Math.round(activeIn.reduce((s, u) => s + minutes(u), 0) / activeIn.length) : 0 };
+    const devices = { visits: {}, signups: {} };
+    vIn.forEach(v => devices.visits[v.dev || 'unknown'] = (devices.visits[v.dev || 'unknown'] || 0) + 1);
+    uIn.forEach(u => devices.signups[u.dev] = (devices.signups[u.dev] || 0) + 1);
+    // retention: share of students who came back N or more days after signing up (only students old enough to count)
+    const ret = n => { const pool = users.filter(u => u.t <= now - n * 864e5); const back = pool.filter(u => (act[u.id] || []).some(t => t >= u.t + n * 864e5)); return { pool: pool.length, back: back.length }; };
+    return { ok: true, days: days, keys: keys, funnel: funnel, daily: { visits: keys.map(k => dv[k]), signups: keys.map(k => ds[k]), active: keys.map(k => da[k]), unlocks: keys.map(k => du[k]) },
+      sources: Object.keys(src).map(k => Object.assign({ src: k }, src[k])).sort((a, b) => b.signups - a.signups || b.visits - a.visits), engagement: engagement, devices: devices,
+      retention: { d1: ret(1), d7: ret(7), d30: ret(30) }, totals: { users: users.length, visits: visits.length } };
+  }),
+  adminStudent: b => admin_(b, () => {
+    const all = usersAll_(), i = rowOf_(all.v, U.id, String(b.id || ''));
+    if (i < 0) return fail_('no_user');
+    const r = all.v[i], uid = String(r[U.id]), prog = progress_(r) || {};
+    const ev = sheet_('events').getDataRange().getValues().slice(1).filter(x => String(x[1]) === uid)
+      .map(x => ({ ts: new Date(x[0]).getTime(), ev: String(x[3]), topic: String(x[4] || ''), qid: x[5], ok: x[6], s: x[7], n: x[8], k: String(x[9] || '') }));
+    const ref = r[U.refBy] ? all.v[rowOf_(all.v, U.id, String(r[U.refBy]))] : null;
+    const pick = (sheetKey, f) => sheet_(sheetKey).getDataRange().getValues().slice(1).filter(x => String(x[2]) === uid).map(f);
+    return { ok: true,
+      profile: { id: uid, name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]), university: String(r[U.uni]), course: String(r[U.course]), created: String(r[U.created]), lastLogin: String(r[U.last]),
+        verifiedUni: String(r[U.vuni] || ''), exam: String(r[U.exam] || ''), examUsed: String(r[U.examUsed] || ''), src: String(r[U.src] || ''), dev: String(r[U.dev] || ''), referredBy: ref ? String(ref[U.name]) : '' },
+      lessons: (prog['idta-lessons'] || []).length, mustTicked: (prog['idta-must'] || []).length, mistakes: (prog['idta-miss'] || []).length, goal: prog['idta-goal'] || null, examDate: prog['idta-examdate'] || null,
+      events: ev.slice(-2000),
+      certs: pick('certs', x => ({ id: String(x[0]), issued: String(x[1]), score: Number(x[4]), n: Number(x[5]), exam: String(x[6]) })),
+      payments: pick('payments', x => ({ id: String(x[0]), at: String(x[1]), amount: Number(x[5]) || 0, status: String(x[8]) })),
+      refunds: pick('refunds', x => ({ id: String(x[0]), at: String(x[1]), amount: Number(x[5]) || 0, status: String(x[8]) })),
+      referrals: referralsOf_(uid) };
+  }),
+
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
     if (hit) return JSON.parse(hit);
@@ -714,6 +793,8 @@ function examCfg_() {
 function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
 function sale_(uid, name, amount, how) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, '', text_(how, 60)]); }
 function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, '') }; }
+function src_(v) { return String(v || '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40); }
+function dev_(v) { return ['phone', 'tablet', 'desktop'].indexOf(String(v)) >= 0 ? String(v) : 'unknown'; }
 function refCode_(uid) { return pid_(uid).slice(0, 8).toUpperCase(); }
 function notifyAdmin_(subject, body) {
   try { const to = props_().getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail(); if (to) MailApp.sendEmail({ to: to, subject: APP + ': ' + subject, body: body }); } catch (e) {}
@@ -837,7 +918,7 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts', 'visits'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();

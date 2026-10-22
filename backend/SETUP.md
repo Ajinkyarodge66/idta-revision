@@ -43,6 +43,19 @@ Lessons, Practice, Calc Lab and flashcards are free for everyone, and verified u
 
 Codes and who used them are stored in the **Coupons** sheet. The lock is on by default once this version of `Code.gs` is deployed.
 
+## Analytics and student tracker
+
+**Admin → Analytics** shows, for the last 7, 30 or 90 days or 12 months:
+- **Sign-up funnel:** visitors → signed up → studied → unlocked exams → took an exam → got a certificate, with the conversion at each step.
+- **Daily charts** for visitors, sign-ups, active students and exam unlocks.
+- **Where students come from:** visitors, sign-ups, conversion, unlocks and revenue per source. WhatsApp hides where visitors came from, so make **tagged links** (`…/?src=msc-ai-whatsapp`) with the builder and use a different one for each group or post.
+- **Engagement:** active today, this week and this month, average study days, estimated study time, and phone vs laptop.
+- **Retention:** the share of students who studied again 1, 7 and 30 days after signing up.
+
+In **Admin → Overview → Students**, click a name to open their **tracker**: source, device, who invited them, study days, a 30-day activity strip, accuracy by topic, a day-by-day timeline (questions, exams, Calc Lab, payments and refunds), certificates and referrals.
+
+Visits are counted once per browser session with no cookies, IDs or IP addresses (the **Visits** sheet). Your own Admin visits aren't counted.
+
 ## Updating the script (keeps the same URL)
 
 1. Paste the new `Code.gs` and click **Save**.
@@ -55,7 +68,7 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 
 | Sheet | Contents |
 |---|---|
-| **Users** | ID, created, name, mobile, email, university, course, password hash + salt (never the password), leaderboard choice, saved progress, last login, reset code hash, consent time, university email, verified university, verification code hash, exam access (how it was unlocked), when they first started a course exam (ends the refund window), who referred them |
+| **Users** | ID, created, name, mobile, email, university, course, password hash + salt (never the password), leaderboard choice, saved progress, last login, reset code hash, consent time, university email, verified university, verification code hash, exam access (how it was unlocked), when they first started a course exam (ends the refund window), who referred them, sign-up source and device |
 | **Sessions** | Login tokens, stored only as hashes, with a 30-day expiry |
 | **Events** | One row per answer, mock or Calc Lab attempt, plus `unlock`/`revoke` rows for exam access (with the amount) |
 | **Announcements** | Banners you post from the admin page (title, message, style, expiry) |
@@ -64,6 +77,7 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 | **Payments** | Uploaded payment screenshots: ID, time, student, mobile, amount, reference, Drive file ID, status (pending/approved/rejected), decision time and reason |
 | **Refunds** | Refund requests: student, amount, where to send it, reason, status (pending/refunded/declined) |
 | **Referral payouts** | Referral reward requests: student, amount, where to send it, status (pending/paid/declined) |
+| **Visits** | One anonymous row per browser session: time, source, device type, logged in or not, returning or not |
 | **Certificates** | Certificates students claimed: ID, date, user, name, score and exam. Anyone can check one at `…/#cert=ID` |
 
 Hidden built-in questions are saved in the `HIDDEN_Q` script property.
