@@ -24,7 +24,8 @@ It works on phones and laptops, and offline once it has loaded. On your phone, u
 | **Flashcards** | 65 flip cards, filterable by topic |
 | **Progress** | Readiness score, accuracy by topic, coverage, mock history, **12 badges** and your certificates |
 | **Leaderboard** | Class leaderboard (best mock score, questions answered, accuracy) and "where the class struggles" by topic |
-| **Account** | Edit your details, change password, log out, delete account |
+| **Refer & earn** | A personal link; £1 for each friend who unlocks the course exams and studies on 10 different days |
+| **Account** | Edit your details, change password, cancel and request a refund (before your first exam), log out, delete account |
 | **Admin** (organiser only) | Class overview, **sales dashboard** (revenue, paid vs free, conversion, 30-day chart), **exam coupon codes** and paid/free grants, **announcements** banner, **add/edit your own questions**, hide built-in questions, **CSV export** |
 
 Topics: data & statistics, similarity & distance, data preparation, classification (decision trees, Naïve Bayes, SVM), evaluation, neural networks & deep learning, ensembles, regression, association rules (Apriori), clustering, and Python/lab code.

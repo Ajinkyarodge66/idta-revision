@@ -375,6 +375,17 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
 .pay-act input{font:inherit;padding:.35rem .5rem;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
 .tab-dot{display:inline-block;min-width:1.2rem;padding:0 .3rem;border-radius:99px;background:var(--bad);color:#fff;font-size:.72rem;font-weight:700;text-align:center;margin-left:.2rem}
 .pay-recent{margin-top:.6rem}.pay-recent summary{cursor:pointer;color:var(--muted)}
+/* ---- refunds & referrals ---- */
+.refund-line{font-size:.88rem;color:var(--muted);margin:.8rem 0 0}
+.refund-note{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;background:var(--accent-soft);border-radius:10px;padding:.7rem .9rem;margin-top:1.2rem}
+.refund-note span{flex:1 1 16rem}
+.invite-note{background:var(--good-soft);color:var(--good);border-radius:8px;padding:.5rem .75rem;font-weight:700;margin:0 0 .8rem}
+.refer-hero{display:grid;gap:1rem;margin-bottom:1rem;background:linear-gradient(135deg,var(--accent-soft),var(--surface) 65%)}
+.refer-hero h1{margin:.2rem 0 .4rem}
+.ref-link{display:flex;flex-wrap:wrap;gap:.5rem}
+.ref-link input{flex:1 1 16rem;min-width:0;font:inherit;font-family:var(--f-mono);font-size:.88rem;padding:.55rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+td.neg{color:var(--bad)}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -507,6 +518,7 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
       <button role="tab" id="tab-stats" data-view="stats" aria-selected="false">Progress</button>
       <button role="tab" id="tab-class" data-view="class" aria-selected="false" hidden>Leaderboard</button>
       <button role="tab" id="tab-account" data-view="account" aria-selected="false" hidden>Account</button>
+      <button role="tab" id="tab-refer" data-view="refer" aria-selected="false" hidden>Refer &amp; earn</button>
       <button role="tab" id="tab-admin" data-view="admin" aria-selected="false" hidden>Admin</button>
     </nav>
     <div class="hdr-actions">
@@ -560,6 +572,8 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
     <h2 class="land-h">Questions</h2>
     <div class="faq">
       <details><summary>Is it free?</summary><p>The whole course is free: every lesson, Practice question, Calc Lab drill, flashcard and the study coach. The timed course exams (random exam, Papers 1–3, topic tests and certificates) unlock with a one-off code. Verified university module packs, including their mock exam, are free. There are no ads.</p></details>
+      <details><summary>Can I get a refund?</summary><p>Yes, if you haven't started a course exam. Cancel in <b>My account</b> any time before you start your first exam and you get the full amount back. Once you start an exam, the payment is non-refundable. You agree to this before paying.</p></details>
+      <details><summary>How does Refer &amp; earn work?</summary><p>Share your personal link from the <b>Refer &amp; earn</b> tab. You earn £1 for every friend who signs up with it, unlocks the course exams and studies on 10 different days. Request your reward in the app and the organiser sends it to you.</p></details>
       <details><summary>How do certificates work?</summary><p>Pass a full 30-question course exam with 70% or more and you can claim a certificate with your name, score and a unique ID. Anyone can check it with its verification link. It records a practice result; it isn't a university qualification.</p></details>
       <details><summary>Is this official?</summary><p>No. It's an unofficial, student-made tool. It isn't affiliated with any university. Always check against your own course notes.</p></details>
       <details><summary>What is a university pack?</summary><p>Extra material for one university's module, such as module notes, the official sample paper and a mock in the real exam format. It's private to that university's students, so you unlock it by verifying your university email. University of Portsmouth (IDTA) students can unlock theirs today; every other part of the app is open to everyone.</p></details>
@@ -654,6 +668,7 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
 </section>
 
 <!-- ===================== ADMIN ===================== -->
+<section id="view-refer" data-view-panel="refer" hidden><div id="refer-root"></div></section>
 <section id="view-cert" data-view-panel="cert" hidden><div id="cert-root"></div></section>
 <section id="view-admin" data-view-panel="admin" hidden>
   <h1>Admin dashboard</h1>
@@ -816,6 +831,8 @@ const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const shuffle = a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const store = {get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+// Referral links look like …/?ref=1A2B3C4D. Remember the code until sign-up, then tidy the address bar.
+(function(){const m=location.search.match(/[?&]ref=([0-9A-Fa-f]{8})\b/);if(m){store.set("idta-ref",m[1].toUpperCase());try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}}})();
 const TYPELABEL = {single:"Multiple choice · single answer",multi:"Multiple response · select all that apply",match:"Matching"};
 Q.forEach((q,i)=>q.id=i);
 
@@ -877,7 +894,7 @@ function renderQ(el,it,mode,num,onChange){
 }
 
 /* ================= tabs ================= */
-const VIEWS=["learn","uni","must","practice","lab","mock","cards","stats","class","account","admin","cert"];
+const VIEWS=["learn","uni","must","practice","lab","mock","cards","stats","class","account","admin","cert","refer"];
 function show(v){
   if(!VIEWS.includes(v)) v="learn";
   document.querySelectorAll("[data-view-panel]").forEach(p=>p.hidden=p.dataset.viewPanel!==v);
@@ -894,6 +911,7 @@ function show(v){
   if(v==="learn"&&typeof courseRender==="function")courseRender();
   if(v==="uni"&&typeof uniRender==="function")uniRender();
   if(v==="cert"&&typeof certRender==="function")certRender();
+  if(v==="refer"&&typeof referRender==="function")referRender();
   window.scrollTo(0,0);
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
@@ -1059,10 +1077,12 @@ function courseExamGrid(locked){
     ${card("Quick mock","10 questions · 20 min","A short mixed check when you're pressed for time.",go('id="mk-quick"',"Start"),best(m=>m.n===10&&(!m.k||m.k==="quick")))}
   </div>`;
 }
-function startMock(n,mins,items,meta){if(MK.mode!=="pack"&&examLocked()){MK.state="intro";return mockRender()}MK.meta=meta||{k:MK.mode==="pack"?"pack":n>=30?"random":"quick",label:MK.mode==="pack"?EX().title:n>=30?"Random exam":"Quick mock"};MK.start=Date.now();MK.n=n;MK.mins=mins;MK.items=items||pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;mockRender()}
+function noteExamStart(){try{const a=AUTH.get();if(MK.mode==="pack"||!signedIn()||!a.profile.examAccess||a.profile.examUsed)return;AUTH.set({...a,profile:{...a.profile,examUsed:true}});api("examStarted",{token:AUTH.token()},{retries:2})}catch(e){}}
+function startMock(n,mins,items,meta){if(MK.mode!=="pack"&&examLocked()){MK.state="intro";return mockRender()}noteExamStart();MK.meta=meta||{k:MK.mode==="pack"?"pack":n>=30?"random":"quick",label:MK.mode==="pack"?EX().title:n>=30?"Random exam":"Quick mock"};MK.start=Date.now();MK.n=n;MK.mins=mins;MK.items=items||pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;mockRender()}
 function examLockHTML(c){
   const how=String(c.how||"").trim();
   return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exams · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the random exam, Papers 1–3, topic tests and quick mocks, with unlimited attempts and certificates. Lessons, Practice, Calc Lab and flashcards stay free.</p></div></div>
+  <p class="refund-line">↩️ Refund policy: cancel any time <b>before you start your first course exam</b> for a full refund. Once you start an exam, the payment is non-refundable.</p>
   <form id="f-unlock" class="unlock-form" novalidate><label for="ex-code">Have a code?</label><div class="unlock-row"><input id="ex-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="e.g. IDTA-7F3K2A"><button class="btn primary" type="submit">Unlock</button></div><div id="ex-msg" role="status"></div></form>
   <div class="unlock-how"><b>How to pay</b>${how?`<p style="white-space:pre-line;margin:.3rem 0 0">${esc(how)}</p>`:`<p style="margin:.3rem 0 0">Ask the organiser of your study group how to pay.</p>`}</div>
   <div class="pay-box" id="pay-box"><p class="hint">Checking your payment…</p></div></div>`;
@@ -1073,6 +1093,7 @@ const payFormHTML=last=>`${last&&last.status==="rejected"?`<div class="feedback 
   <form id="f-pay" novalidate><label class="file-drop" for="pay-file"><input type="file" id="pay-file" accept="image/png,image/jpeg,image/webp"><span class="fd-ic" aria-hidden="true">📷</span><span id="pay-fname">Choose screenshot</span></label>
   <img id="pay-prev" class="pay-prev" alt="Preview of your payment screenshot" hidden>
   <div class="field" style="margin-top:.7rem"><label for="pay-ref">Transaction ID / UTR (optional)</label><input id="pay-ref" maxlength="60" autocomplete="off" placeholder="e.g. 4123 5678 9012"></div>
+  <label class="check" style="margin:.2rem 0 .6rem"><input type="checkbox" id="pay-agree"><span>I agree to the refund policy: I can cancel for a full refund until I start my first course exam. After I start an exam, the payment is non-refundable.</span></label>
   <div id="pay-msg" role="status"></div><button class="btn primary" type="submit">Send for approval</button></form>`;
 const payPendingHTML=pm=>`<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Screenshot received. Waiting for approval.</b><span>Sent ${ago(new Date(pm.submitted).getTime())}. The organiser usually checks within minutes. Keep this page open, or come back later; it unlocks automatically.</span></div></div>`;
 function shrinkImage(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);const d=c.toDataURL("image/jpeg",.8);res({mime:"image/jpeg",data:d.split(",")[1],preview:d})};img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("bad"))};img.src=url})}
@@ -1092,7 +1113,7 @@ function bindPayForm(){
   $("#pay-file").onchange=async e=>{const file=e.target.files[0];picked=null;$("#pay-msg").innerHTML="";if(!file)return;
     if(!/^image\//.test(file.type))return msg(false,"Choose an image file (a screenshot).");
     try{picked=await shrinkImage(file);$("#pay-fname").textContent=file.name;const pv=$("#pay-prev");pv.src=picked.preview;pv.hidden=false}catch(err){msg(false,"That image couldn't be opened. Try another screenshot.")}};
-  f.onsubmit=async e=>{e.preventDefault();if(!picked)return msg(false,"Choose your payment screenshot first.");
+  f.onsubmit=async e=>{e.preventDefault();if(!picked)return msg(false,"Choose your payment screenshot first.");if(!$("#pay-agree").checked)return msg(false,"Tick the box to agree to the refund policy.");
     await busy(f.querySelector("button[type=submit]"),"Uploading…",async()=>{
       const r=await api("paySubmit",{token:AUTH.token(),mime:picked.mime,image:picked.data,ref:$("#pay-ref").value.trim()});
       if(!r.ok)return msg(false,errMsg(r.error));
@@ -1126,7 +1147,9 @@ function mockRender(){
     root.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{MK.mode=b.dataset.mode;MK.chosen=true;mockRender()});
     if(MK.mode!=="pack"){
       const locked=examLocked(),act=root.querySelector(".intro > .qnav");
-      if(act)act.outerHTML=(locked?examLockHTML(examCfg()):"")+courseExamGrid(locked);
+      if(act)act.outerHTML=(locked?examLockHTML(examCfg()):`<div id="ex-refund"></div>`)+courseExamGrid(locked);
+      let canRefund=false;try{canRefund=!locked&&signedIn()&&AUTH.get().profile.examAccess&&!AUTH.get().profile.examUsed}catch(e){}
+      if(canRefund)api("myPurchase",{token:AUTH.token()},{retries:0}).then(r=>{const b=$("#ex-refund");if(b&&r.ok&&r.refundable){b.innerHTML=`<div class="refund-note">↩️ <span>You haven't started an exam yet, so you can still cancel for a full refund. <b>Starting any exam ends the refund window.</b></span><button class="btn small" id="ex-cancel">Cancel &amp; refund</button></div>`;$("#ex-cancel").onclick=()=>show("account")}});
       if(locked){bindExamLock();return}
       root.querySelectorAll("[data-paper]").forEach(b=>b.onclick=()=>{const p=+b.dataset.paper;startMock(30,60,paperQs(p).map(instance),{k:"paper",p,label:"Paper "+p})});
       $("#mk-ttest").onclick=()=>{const t=$("#mk-topic").value;startMock(10,15,topicTestQs(t).map(instance),{k:"topic",p:t,label:"Topic test · "+TOPICS[t]})};
@@ -1468,6 +1491,13 @@ const ERR = {
   bad_coupon:"That code isn't valid. Check it and try again.",
   not_eligible:"Certificates are for full 30-question course exams passed with 70% or more.",
   bad_image:"That image couldn't be uploaded. Choose a PNG or JPG screenshot under 2 MB.",
+  not_refundable:"There's no refundable payment on your account.",
+  exam_used:"You've already started a course exam, so this payment can't be refunded.",
+  bad_refund_to:"Tell us where to send the money: a UPI ID, PayPal email or bank details.",
+  refund_pending:"You already have a refund request waiting.",
+  no_refund:"That refund request no longer exists. Refresh the page.",
+  nothing_to_pay:"There's nothing to claim yet.",
+  no_payout:"That payout request no longer exists. Refresh the page.",
   pay_pending:"You already have a screenshot waiting for approval.",
   already_unlocked:"Your exams are already unlocked. Refresh the page.",
   no_payment:"That payment no longer exists. Refresh the page.",
@@ -1627,7 +1657,7 @@ function authRender(msg) {
       });
     };
   } else if (authMode === "signup") {
-    box.innerHTML = `<h2>Create your account</h2>${note}<form id="f-signup" novalidate>${field("su-name","Full name (shown on the leaderboard if you choose)","text",'autocomplete="name" maxlength="40"')}${mobileField("su-mobile")}${field("su-email","Email (for password reset codes)","email",'autocomplete="email" maxlength="100"')}${field("su-uni","University name","text",'list="uni-list" maxlength="80" autocomplete="organization"')}<datalist id="uni-list"><option value="University of Portsmouth"></datalist>${field("su-course","Course","text",'list="course-list" maxlength="80"')}<datalist id="course-list"><option value="MSc Data Science"><option value="MSc Data Analytics"><option value="MSc Artificial Intelligence"><option value="MSc Computer Science"><option value="BSc Computer Science"></datalist>${field("su-pw","Create password (min 8 characters)","password",'autocomplete="new-password"')}${field("su-pw2","Confirm password","password",'autocomplete="new-password"')}
+    box.innerHTML = `<h2>Create your account</h2>${note}${store.get("idta-ref", "") ? `<p class="invite-note">🎁 A friend invited you. Welcome!</p>` : ""}<form id="f-signup" novalidate>${field("su-name","Full name (shown on the leaderboard if you choose)","text",'autocomplete="name" maxlength="40"')}${mobileField("su-mobile")}${field("su-email","Email (for password reset codes)","email",'autocomplete="email" maxlength="100"')}${field("su-uni","University name","text",'list="uni-list" maxlength="80" autocomplete="organization"')}<datalist id="uni-list"><option value="University of Portsmouth"></datalist>${field("su-course","Course","text",'list="course-list" maxlength="80"')}<datalist id="course-list"><option value="MSc Data Science"><option value="MSc Data Analytics"><option value="MSc Artificial Intelligence"><option value="MSc Computer Science"><option value="BSc Computer Science"></datalist>${field("su-pw","Create password (min 8 characters)","password",'autocomplete="new-password"')}${field("su-pw2","Confirm password","password",'autocomplete="new-password"')}
       <label class="check"><input type="checkbox" id="su-lb" checked><span>Show my name, course and scores on the class leaderboard</span></label>
       <label class="check"><input type="checkbox" id="su-ok"><span>I agree that my details and results are stored as described below</span></label>${PRIVACY}
       <button class="btn primary wide" type="submit">Create account</button></form><div class="auth-links"><button class="linkbtn" data-m="login">I already have an account</button></div>`;
@@ -1642,8 +1672,9 @@ function authRender(msg) {
       const lb = $("#su-lb").checked;
       await busy(e.target.querySelector("button[type=submit]"), "Creating account…", async () => {
         let d; try { d = await derivePw(pw, mobile); } catch (x) { return authMsg({ text:ERR.no_crypto }); }
-        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true });
+        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true, ref:store.get("idta-ref", "") });
         if (!r.ok) return authMsg({ text:errMsg(r.error) });
+        try { localStorage.removeItem("idta-ref"); } catch (x) {}
         signInDone(r, "Account created. Welcome, " + r.profile.name + "!");
       });
     };
@@ -1712,7 +1743,63 @@ function acctBadge() {
 function syncTabs() {
   $("#tab-class").hidden = !SYNC_URL;
   $("#tab-account").hidden = !signedIn();
+  $("#tab-refer").hidden = !signedIn();
   $("#tab-admin").hidden = !(SYNC_URL && store.get("idta-admin-key", ""));
+}
+
+/* ---------- account: course exam purchase, cancel & refund ---------- */
+async function purchaseRender() {
+  const box = $("#ac-purchase"); if (!box || !signedIn()) return;
+  const r = await api("myPurchase", { token:AUTH.token() }, { retries:1 });
+  if (!$("#ac-purchase") || !r.ok) return;
+  const d = s => new Date(s).toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" });
+  const rf = r.refund, policy = `<p class="hint" style="margin-bottom:0">Refund policy: a full refund if you cancel before starting your first course exam. Once you start an exam, the payment is non-refundable.</p>`;
+  let inner;
+  if (rf && rf.status === "pending") inner = `<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Refund requested: £${rf.amount}</b><span>Requested ${d(rf.requested)}. The organiser will send it to you and email you when it's done.</span></div></div>`;
+  else if (r.access && r.refundable) inner = `<p><span class="badge ok">✓ Unlocked</span> You paid <b>£${r.paid}</b>. You haven't started a course exam yet, so you can cancel for a full refund.</p>
+    <div id="rf-box"><button class="btn" id="rf-open">Cancel and request a refund…</button></div>${policy}`;
+  else if (r.access) inner = `<p><span class="badge ok">✓ Unlocked</span> ${r.paid ? `You paid £${r.paid}. You've started a course exam, so this payment is no longer refundable.` : "Unlocked with a free code or by the organiser."}</p>${r.paid ? "" : policy}`;
+  else inner = `${rf ? `<p>${rf.status === "refunded" ? `<span class="badge ok">Refunded</span> £${rf.amount} was sent back to you on ${d(rf.requested)}.` : rf.status === "declined" ? `<span class="badge warn">Refund declined</span> ${esc(rf.note || "")}` : ""}</p>` : ""}<p>The course exams are locked. <button class="linkbtn" id="rf-unlock">Unlock them on the Mock exam tab</button></p>${policy}`;
+  box.innerHTML = `<div class="card" style="margin-bottom:1rem"><h2>Course exams</h2>${inner}</div>`;
+  if ($("#rf-unlock")) $("#rf-unlock").onclick = () => show("mock");
+  if ($("#rf-open")) $("#rf-open").onclick = () => {
+    $("#rf-box").innerHTML = `<div class="confirmbar" style="display:block"><p style="margin-top:0"><b>Cancel and get £${r.paid} back.</b> Your exam access ends straight away.</p>
+      ${field("rf-to", "Where should we send your refund? (UPI ID, PayPal email or bank details)", "text", 'maxlength="100" autocomplete="off"')}
+      <div class="field"><label for="rf-why">Why are you cancelling? (optional)</label><textarea id="rf-why" rows="2" maxlength="200"></textarea></div>
+      <div id="rf-msg"></div><div class="qnav" style="justify-content:flex-start;gap:.5rem"><button class="btn danger" id="rf-yes">Cancel and request refund</button><button class="btn" id="rf-no">Keep my access</button></div></div>`;
+    $("#rf-no").onclick = purchaseRender;
+    $("#rf-yes").onclick = e => busy(e.target, "Sending…", async () => {
+      const to = $("#rf-to").value.trim();
+      if (to.length < 5) { $("#rf-msg").innerHTML = `<div class="feedback no">${esc(ERR.bad_refund_to)}</div>`; return; }
+      const x = await api("refundRequest", { token:AUTH.token(), to, reason:$("#rf-why").value.trim() });
+      if (!x.ok) { $("#rf-msg").innerHTML = `<div class="feedback no">${esc(errMsg(x.error))}</div>`; return; }
+      AUTH.set({ ...AUTH.get(), profile:x.profile }); toast("Cancelled. Your refund request has been sent."); purchaseRender();
+    });
+  };
+}
+
+/* ---------- Refer & earn ---------- */
+async function referRender() {
+  const root = $("#refer-root");
+  if (!signedIn()) { root.innerHTML = `<p class="hint">Log in to get your referral link.</p>`; return; }
+  const c = examCfg() || {}, reward = c.refReward || 1, days = c.refDays || 10;
+  root.innerHTML = `<p class="hint">Loading…</p>`;
+  const r = await api("myReferrals", { token:AUTH.token() }, { retries:1 });
+  if (!r.ok) { root.innerHTML = `<p class="hint">${r.error === "unknown_action" ? "Refer & earn is coming with the next update." : esc(errMsg(r.error))}</p>`; return; }
+  const link = SHARE_URL + "?ref=" + r.code, msgTxt = `I'm revising AI & machine learning with this free app: lessons, practice questions and timed mock exams. Join with my link: ${link}`;
+  root.innerHTML = `<div class="refer-hero card"><div><div class="label">Refer &amp; earn</div><h1>Earn £${reward} for every friend</h1>
+    <p class="lede">Share your link. You earn <b>£${reward}</b> for each friend who signs up with it, <b>unlocks the course exams</b> and studies on <b>${r.days} different days</b>.</p></div>
+    <div class="ref-link"><input id="rf-link" value="${esc(link)}" readonly aria-label="Your referral link"><button class="btn primary" id="rf-copy">Copy link</button><a class="btn" id="rf-wa" href="https://wa.me/?text=${encodeURIComponent(msgTxt)}" target="_blank" rel="noopener">Share on WhatsApp</a></div></div>
+  <div class="tiles"><div class="tile"><div class="label">Friends joined</div><div class="big">${r.friends.length}</div><div class="sub">with your link</div></div><div class="tile"><div class="label">Qualified</div><div class="big">${r.qualified}</div><div class="sub">paid + ${r.days} days</div></div><div class="tile"><div class="label">Earned</div><div class="big">£${r.earned}</div><div class="sub">£${r.paidOut} paid out</div></div><div class="tile"><div class="label">Available</div><div class="big">£${r.available}</div><div class="sub">${r.pending ? `£${r.pending} on its way` : "ready to claim"}</div></div></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Your friends</h2>${r.friends.length ? `<div class="tbl"><table><tr><th>Friend</th><th>Joined</th><th>Unlocked</th><th>Days studied</th><th>Status</th></tr>${r.friends.map(f => `<tr><td>${esc(f.name)}</td><td>${new Date(f.joined).toLocaleDateString([], { day:"numeric", month:"short" })}</td><td>${f.paid ? "✓" : "–"}</td><td><span class="bt-bar" style="display:inline-block;width:5rem;vertical-align:middle;margin:0 .4rem 0 0"><span style="width:${f.days / r.days * 100}%"></span></span>${f.days}/${r.days}</td><td>${f.qualified ? `<span class="badge ok">+£${reward}</span>` : !f.paid ? "Not unlocked yet" : `${r.days - f.days} more day${r.days - f.days === 1 ? "" : "s"}`}</td></tr>`).join("")}</table></div>` : `<p class="hint">No one has joined with your link yet. Share it in your class group chat.</p>`}</div>
+  <div class="card" style="margin-bottom:1rem"><h2>Get paid</h2>${r.available >= reward ? `<form id="f-payout" novalidate>${field("po-to", "Where should we send £" + r.available + "? (UPI ID, PayPal email or bank details)", "text", 'maxlength="100" autocomplete="off"')}<div id="po-msg"></div><button class="btn primary" type="submit">Request £${r.available}</button></form>` : `<p class="hint">${r.pending ? `£${r.pending} requested. The organiser will send it soon.` : `When a friend qualifies, you can request your reward here.`}</p>`}</div>
+  <p class="hint">How it works: your friend must sign up using your link, unlock the course exams and use the app on ${r.days} different days. Friends who get a refund don't count. Rewards are paid by the organiser, usually within a week. Self-referrals and fake accounts aren't paid.</p>`;
+  $("#rf-copy").onclick = async () => { try { await navigator.clipboard.writeText(link); toast("Link copied."); } catch (e) { $("#rf-link").select(); } };
+  if ($("#f-payout")) $("#f-payout").onsubmit = e => { e.preventDefault(); busy(e.target.querySelector("button"), "Sending…", async () => {
+    const x = await api("referralPayout", { token:AUTH.token(), to:$("#po-to").value.trim() });
+    if (!x.ok) { $("#po-msg").innerHTML = `<div class="feedback no">${esc(errMsg(x.error))}</div>`; return; }
+    toast("Request sent."); referRender();
+  }); };
 }
 
 /* ---------- account tab ---------- */
@@ -1720,7 +1807,7 @@ function accountRender() {
   const el = $("#account-root"), a = AUTH.get();
   if (!a) { el.innerHTML = `<p class="hint">You're not logged in.</p>`; return; }
   const p = a.profile;
-  el.innerHTML = `<div class="card" style="margin-bottom:1rem"><h2>Your details</h2><form id="f-prof" novalidate>
+  el.innerHTML = `<div id="ac-purchase"></div><div class="card" style="margin-bottom:1rem"><h2>Your details</h2><form id="f-prof" novalidate>
     ${field("pf-name","Full name","text",`maxlength="40" value="${esc(p.name)}"`)}
     <div class="field"><label>Mobile number</label><input value="+${esc(p.mobile)}" disabled></div>
     <div class="field"><label>Email</label><input value="${esc(p.email)}" disabled></div>
@@ -1740,6 +1827,7 @@ function accountRender() {
     <div id="del-box"><button class="btn danger" id="ac-del">Delete my account…</button></div></div>
   <div style="margin-top:1rem">${PRIVACY}</div>`;
   const msg = (id, ok, text) => { $("#" + id).innerHTML = `<div class="feedback ${ok ? "ok" : "no"}" role="alert">${esc(text)}</div>`; };
+  purchaseRender();
   if ($("#pf-verify")) $("#pf-verify").onclick = () => show("uni");
   $("#f-prof").onsubmit = async e => {
     e.preventDefault();
@@ -1869,7 +1957,7 @@ async function adminRender() {
   const tabs = [["overview","Overview"],["exam","Exam & coupons"],["news","Announcements"],["questions","Questions"],["unis","Universities"],["export","Export"]];
   root.innerHTML = `<div class="filters" role="tablist" aria-label="Admin sections" style="margin-bottom:1rem">${tabs.map(([k, l]) => `<button aria-pressed="${AD.tab === k}" data-t="${k}">${l}</button>`).join("")}<button id="ad-out" style="margin-left:auto">Sign out of admin</button></div><div id="ad-body"><p class="hint">Loading…</p></div>`;
   root.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { AD.tab = b.dataset.t; adminRender(); });
-  if (AD.tab !== "exam") api("adminPayments", { key }, { retries:0 }).then(pm => { if (pm.ok) { payTabBadge(pm.pending.length); AD.payIds = pm.pending.map(p => p.id).join(); } });
+  if (AD.tab !== "exam") Promise.all([api("adminPayments", { key }, { retries:0 }), api("adminRefunds", { key }, { retries:0 }), api("adminReferrals", { key }, { retries:0 })]).then(([pm, rq, rr]) => { AD.other = (rq.ok ? rq.pending.length : 0) + (rr.ok ? rr.pending.length : 0); if (pm.ok) { payTabBadge(pm.pending.length); AD.payIds = pm.pending.map(p => p.id).join(); } });
   $("#ad-out").onclick = () => { store.set("idta-admin-key", ""); AD.data = null; syncTabs(); show("learn"); };
   if (AD.tab === "news") return adminNews();
   if (AD.tab === "questions") return adminQuestions();
@@ -1891,7 +1979,7 @@ function adminOverview(d) {
   const tp = Object.keys(d.topics || {}).filter(k => TOPICS[k]).map(k => ({ k, r:d.topics[k][0], n:d.topics[k][1] })).sort((a, b) => a.r / a.n - b.r / b.n);
   const hard = Object.keys(d.questions || {}).map(id => ({ id:+id, r:d.questions[id][0], n:d.questions[id][1] })).filter(x => x.n >= 3 && Q[x.id]).sort((a, b) => a.r / a.n - b.r / b.n).slice(0, 10);
   const byCourse = {}; users.forEach(u => { const k = u.course || "–"; byCourse[k] = (byCourse[k] || 0) + 1; });
-  const evName = { q:"answered", mock:"finished a mock", lab:"Calc Lab", unlock:"unlocked the course exams", revoke:"exam access removed" };
+  const evName = { q:"answered", mock:"finished a mock", lab:"Calc Lab", unlock:"unlocked the course exams", revoke:"exam access removed", refund:"was refunded", payout:"received a referral reward", restore:"exam access restored" };
   const fmtDate = s => { const t = new Date(s); return isNaN(t) ? "–" : t.toLocaleDateString([], { day:"numeric", month:"short" }); };
   $("#ad-body").innerHTML = `<div class="qnav" style="justify-content:flex-start;gap:.5rem;margin-top:0"><button class="btn" id="ad-refresh">Refresh</button><span class="hint">${d.rows} activity rows · student details are personal data, so keep them private</span></div>
   <div class="tiles"><div class="tile"><div class="label">Accounts</div><div class="big">${users.length}</div><div class="sub">${users.filter(u => u.lb).length} on leaderboard</div></div><div class="tile"><div class="label">Active</div><div class="big">${users.filter(u => u.last > dayAgo).length}</div><div class="sub">last 24 h · ${users.filter(u => u.last > weekAgo).length} this week</div></div><div class="tile"><div class="label">Class accuracy</div><div class="big">${totQ ? Math.round(totR / totQ * 100) + "%" : "–"}</div><div class="sub">${totQ} answers · ${totM} mocks</div></div></div>
@@ -1937,7 +2025,9 @@ const money = n => "£" + (Math.round(n * 100) / 100).toFixed(Number.isInteger(n
 function salesHTML(sl) {
   const sales = (sl.sales || []).filter(x => x.kind === "unlock").sort((a, b) => a.ts - b.ts);
   const now = new Date(), m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const rev = sales.reduce((s, x) => s + x.amount, 0), revM = sales.filter(x => x.ts >= m0).reduce((s, x) => s + x.amount, 0);
+  const all = (sl.sales || []).slice().sort((a, b) => a.ts - b.ts), sum = (k, f) => all.filter(x => x.kind === k && (!f || f(x))).reduce((s, x) => s + x.amount, 0);
+  const refunds = sum("refund"), payouts = sum("payout");
+  const rev = sales.reduce((s, x) => s + x.amount, 0), revM = sales.filter(x => x.ts >= m0).reduce((s, x) => s + x.amount, 0) - sum("refund", x => x.ts >= m0) - sum("payout", x => x.ts >= m0);
   const paid = sales.filter(x => x.amount > 0).length, free = sales.length - paid;
   const conv = sl.accounts ? Math.round(sl.unlocked / sl.accounts * 100) : 0;
   const days = [...Array(30)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 29 + i); return d; });
@@ -1945,9 +2035,9 @@ function salesHTML(sl) {
   const mx = Math.max(1, ...per.map(p => p.v)), W = 600, H = 140, bw = W / 30;
   const chart = `<svg class="sales-chart" viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="Revenue per day, last 30 days">${per.map((p, i) => { const h = p.v / mx * (H - 10); return `<rect x="${(i * bw + 2).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${Math.max(p.n ? 2 : 0, h).toFixed(1)}" rx="2" class="${p.v ? "bar-paid" : "bar-free"}"><title>${p.d.toLocaleDateString([], { day:"numeric", month:"short" })}: ${money(p.v)} · ${p.n} unlock${p.n === 1 ? "" : "s"}</title></rect>`; }).join("")}<line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="var(--line)"/><text x="0" y="${H + 14}" font-size="11" fill="var(--muted)">${days[0].toLocaleDateString([], { day:"numeric", month:"short" })}</text><text x="${W}" y="${H + 14}" font-size="11" fill="var(--muted)" text-anchor="end">Today</text></svg>`;
   return `<div class="card" style="margin-bottom:1rem"><h2>Sales</h2>
-  <div class="tiles"><div class="tile"><div class="label">Revenue</div><div class="big">${money(rev)}</div><div class="sub">all time</div></div><div class="tile"><div class="label">This month</div><div class="big">${money(revM)}</div><div class="sub">${now.toLocaleDateString([], { month:"long" })}</div></div><div class="tile"><div class="label">Unlocks</div><div class="big">${sales.length}</div><div class="sub">${paid} paid · ${free} free</div></div><div class="tile"><div class="label">Conversion</div><div class="big">${conv}%</div><div class="sub">${sl.unlocked} of ${sl.accounts} accounts unlocked</div></div></div>
+  <div class="tiles"><div class="tile"><div class="label">Net income</div><div class="big">${money(rev - refunds - payouts)}</div><div class="sub">${money(rev)} in · ${money(refunds)} refunds · ${money(payouts)} referrals</div></div><div class="tile"><div class="label">This month (net)</div><div class="big">${money(revM)}</div><div class="sub">${now.toLocaleDateString([], { month:"long" })}</div></div><div class="tile"><div class="label">Unlocks</div><div class="big">${sales.length}</div><div class="sub">${paid} paid · ${free} free</div></div><div class="tile"><div class="label">Conversion</div><div class="big">${conv}%</div><div class="sub">${sl.unlocked} of ${sl.accounts} accounts unlocked</div></div></div>
   <h3 style="margin:1rem 0 .3rem">Revenue, last 30 days</h3>${chart}
-  <h3 style="margin:1rem 0 .3rem">Recent unlocks</h3>${sales.length ? `<div class="tbl"><table><tr><th>When</th><th>Student</th><th>How</th><th>Amount</th></tr>${sales.slice(-30).reverse().map(x => `<tr><td>${ago(x.ts)}</td><td>${esc(x.name)}</td><td>${esc(x.how)}</td><td class="num">${x.amount ? money(x.amount) : "free"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No unlocks yet. When a student redeems a code or you press Paid/Free in Overview, it appears here.</p>`}
+  <h3 style="margin:1rem 0 .3rem">Money in &amp; out</h3>${all.some(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout") ? `<div class="tbl"><table><tr><th>When</th><th>Student</th><th>What</th><th>Amount</th></tr>${all.filter(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout").slice(-40).reverse().map(x => `<tr><td>${ago(x.ts)}</td><td>${esc(x.name)}</td><td>${x.kind === "refund" ? "Refund" : x.kind === "payout" ? "Referral reward" : esc(x.how)}</td><td class="num${x.kind !== "unlock" ? " neg" : ""}">${x.kind !== "unlock" ? "−" + money(x.amount) : x.amount ? money(x.amount) : "free"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No unlocks yet. When a student redeems a code or you press Paid/Free in Overview, it appears here.</p>`}
   <p class="hint">Amounts are what you recorded (the code's value, or Paid in Overview). Check them against your bank or payment app.</p></div>`;
 }
 function payQueueHTML(pm) {
@@ -1960,7 +2050,36 @@ function payQueueHTML(pm) {
     : `<p class="hint">Nothing waiting. New screenshots appear here automatically, and you also get an email.</p>`}
   ${pm.recent.length ? `<details class="pay-recent"><summary>Recent decisions (${pm.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Ref</th><th>Result</th><th>When</th></tr>${pm.recent.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${money(p.amount)}</td><td>${esc(p.ref || "–")}</td><td>${p.status === "approved" ? `<span class="badge ok">Approved</span>` : `<span class="badge warn">Rejected</span>${p.note ? " " + esc(p.note) : ""}`}</td><td>${when(p.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
 }
-function payTabBadge(n) { const b = document.querySelector('#admin-root [data-t="exam"]'); if (b) b.innerHTML = "Exam &amp; coupons" + (n ? ` <span class="tab-dot">${n}</span>` : ""); }
+function payTabBadge(n) { n += AD.other || 0; const b = document.querySelector('#admin-root [data-t="exam"]'); if (b) b.innerHTML = "Exam &amp; coupons" + (n ? ` <span class="tab-dot">${n}</span>` : ""); }
+function refundQueueHTML(rq) {
+  const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
+  if (!rq.pending.length && !rq.recent.length) return "";
+  return `<div class="card" style="margin-bottom:1rem"><h2>Refund requests ${rq.pending.length ? `<span class="badge warn">${rq.pending.length} to pay</span>` : ""}</h2>
+  ${rq.pending.length ? `<p class="hint">Their exam access is already removed. Send the money, then click <b>Mark refunded</b>. <b>Decline</b> gives their access back.</p>` + rq.pending.map(x => `<div class="pay-item"><div class="pay-main"><b>${esc(x.name)} · £${x.amount}</b><span>${esc(x.mobile)} · ${when(x.requested)}</span><span>Send to: <code>${esc(x.to)}</code></span>${x.reason ? `<span>Reason: ${esc(x.reason)}</span>` : ""}</div>
+    <div class="pay-act"><button class="btn primary small" data-rfd="${esc(x.id)}">Mark refunded</button><input id="rfn-${esc(x.id)}" class="why" maxlength="120" placeholder="Reason if declining"><button class="btn small" data-rfx="${esc(x.id)}">Decline</button></div></div>`).join("") : `<p class="hint">No refunds waiting.</p>`}
+  ${rq.recent.length ? `<details class="pay-recent"><summary>Recent refunds (${rq.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Result</th><th>When</th></tr>${rq.recent.map(x => `<tr><td>${esc(x.name)}</td><td class="num">£${x.amount}</td><td>${x.status === "refunded" ? `<span class="badge ok">Refunded</span>` : `<span class="badge warn">Declined</span> ${esc(x.note || "")}`}</td><td>${when(x.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
+}
+function referralAdminHTML(rr) {
+  const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
+  return `<div class="card" style="margin-bottom:1rem"><h2>Referrals ${rr.pending.length ? `<span class="badge warn">${rr.pending.length} to pay</span>` : ""}</h2>
+  <p class="hint">Students earn £${rr.reward} for each friend who signs up with their link, unlocks the course exams and studies on ${rr.days} different days. Pay them yourself, then click <b>Mark paid</b>.</p>
+  ${rr.pending.map(x => `<div class="pay-item"><div class="pay-main"><b>${esc(x.name)} · £${x.amount}</b><span>${esc(x.mobile)} · ${when(x.requested)}</span><span>Send to: <code>${esc(x.to)}</code></span></div>
+    <div class="pay-act"><button class="btn primary small" data-pod="${esc(x.id)}">Mark paid</button><input id="pon-${esc(x.id)}" class="why" maxlength="120" placeholder="Reason if declining"><button class="btn small" data-pox="${esc(x.id)}">Decline</button></div></div>`).join("")}
+  ${rr.referrers.length ? `<div class="tbl"><table><tr><th>Referrer</th><th>Friends joined</th><th>Qualified</th><th>Earned</th><th>Paid</th><th>Requested</th></tr>${rr.referrers.map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.invited}</td><td class="num">${x.qualified}</td><td class="num">£${x.earned}</td><td class="num">£${x.paid}</td><td class="num">${x.pending ? "£" + x.pending : "–"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No referrals yet.</p>`}
+  ${rr.recent.length ? `<details class="pay-recent"><summary>Recent payouts (${rr.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Result</th><th>When</th></tr>${rr.recent.map(x => `<tr><td>${esc(x.name)}</td><td class="num">£${x.amount}</td><td>${x.status === "paid" ? `<span class="badge ok">Paid</span>` : `<span class="badge warn">Declined</span> ${esc(x.note || "")}`}</td><td>${when(x.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
+}
+function bindMoneyQueues() {
+  const key = store.get("idta-admin-key", ""), body = $("#ad-body");
+  const two = (b, fn) => { if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Click to confirm"; return; } fn(); };
+  body.querySelectorAll("[data-rfd],[data-rfx]").forEach(b => b.onclick = () => two(b, () => busy(b, "Saving…", async () => {
+    const id = b.dataset.rfd || b.dataset.rfx, r = await api("adminDecideRefund", { key, id, refunded:!!b.dataset.rfd, note:($("#rfn-" + id) || {}).value || "" });
+    if (!r.ok) return toast(errMsg(r.error)); toast(b.dataset.rfd ? "Marked as refunded. The student has been emailed." : "Declined. Their access is restored."); adminRender();
+  })));
+  body.querySelectorAll("[data-pod],[data-pox]").forEach(b => b.onclick = () => two(b, () => busy(b, "Saving…", async () => {
+    const id = b.dataset.pod || b.dataset.pox, r = await api("adminDecidePayout", { key, id, paid:!!b.dataset.pod, note:($("#pon-" + id) || {}).value || "" });
+    if (!r.ok) return toast(errMsg(r.error)); toast(b.dataset.pod ? "Marked as paid." : "Payout declined."); adminRender();
+  })));
+}
 function bindPayQueue() {
   const key = store.get("idta-admin-key", ""), q = $("#pay-queue"); if (!q) return;
   q.querySelectorAll("[data-pview]").forEach(b => b.onclick = () => busy(b, "Loading…", async () => {
@@ -1993,12 +2112,12 @@ setInterval(async () => {
 }, 30000);
 async function adminExam() {
   const key = store.get("idta-admin-key", ""), body = $("#ad-body");
-  const [d, sl, pm] = await Promise.all([api("adminCoupons", { key }), api("adminSales", { key }), api("adminPayments", { key })]);
+  const [d, sl, pm, rq, rr] = await Promise.all([api("adminCoupons", { key }), api("adminSales", { key }), api("adminPayments", { key }), api("adminRefunds", { key }), api("adminReferrals", { key })]);
   if (!d.ok) { body.innerHTML = `<p class="hint">${esc(d.error === "unknown_action" ? "Update Code.gs in Apps Script to use coupons (see backend/SETUP.md)." : errMsg(d.error))}</p>`; return; }
   const c = d.exam || { lock:true, price:"£3", how:"" };
   const fmt = s => { const t = new Date(s); return s && !isNaN(t) ? t.toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" }) : ""; };
   const list = cs => cs.length ? `<div class="tbl"><table id="cp-table"><tr><th>Code</th><th>Used</th><th>Value</th><th>Expires</th><th>Note</th><th>Created</th><th></th></tr>${cs.map(x => { const dead = x.used >= x.max || (x.expires && new Date(x.expires).getTime() < Date.now()); return `<tr${dead ? ' class="dim"' : ""}><td><code>${esc(x.code)}</code> <button class="btn small" data-copy="${esc(x.code)}">Copy</button></td><td class="num">${x.used} / ${x.max}</td><td class="num">${x.value ? money(x.value) : "free"}</td><td>${x.expires ? fmt(x.expires) : "never"}</td><td>${esc(x.note)}</td><td>${fmt(x.created)}</td><td><button class="btn small" data-del="${esc(x.code)}">Delete</button></td></tr>`; }).join("")}</table></div>` : `<p class="hint">No codes yet.</p>`;
-  body.innerHTML = `${pm.ok ? `<div id="pay-queue">${payQueueHTML(pm)}</div>` : ""}${sl.ok ? salesHTML(sl) : ""}<div class="card" style="margin-bottom:1rem"><h2>Course exam access</h2><p class="hint">Practice, lessons, Calc Lab and flashcards are always free. The verified university module exam (e.g. Portsmouth) is always free for verified students. This setting only controls the AI &amp; ML course exam.</p>
+  body.innerHTML = `${pm.ok ? `<div id="pay-queue">${payQueueHTML(pm)}</div>` : ""}${rq.ok ? refundQueueHTML(rq) : ""}${rr.ok ? referralAdminHTML(rr) : ""}${sl.ok ? salesHTML(sl) : ""}<div class="card" style="margin-bottom:1rem"><h2>Course exam access</h2><p class="hint">Practice, lessons, Calc Lab and flashcards are always free. The verified university module exam (e.g. Portsmouth) is always free for verified students. This setting only controls the AI &amp; ML course exam.</p>
   <form id="f-excfg" novalidate><label class="chk"><input type="checkbox" id="ec-lock" ${c.lock ? "checked" : ""}> Students need a code (or a grant from you) to take the course exam</label>
   ${field("ec-price","Price shown","text",'maxlength="20" placeholder="£3"')}
   <div class="field"><label for="ec-how">How to pay / get a code (shown on the lock screen to logged-in students)</label><textarea id="ec-how" rows="4" maxlength="600" placeholder="e.g. Pay £3 at [your payment link], then WhatsApp your payment reference to the organiser and you'll get a code."></textarea></div>
@@ -2025,7 +2144,9 @@ async function adminExam() {
     });
   };
   bindList();
+  AD.other = (rq.ok ? rq.pending.length : 0) + (rr.ok ? rr.pending.length : 0);
   if (pm.ok) { AD.payIds = pm.pending.map(p => p.id).join(); bindPayQueue(); payTabBadge(pm.pending.length); }
+  bindMoneyQueues();
   $("#f-cp").onsubmit = async e => { e.preventDefault(); await busy(e.target.querySelector("button[type=submit]"), "Creating…", async () => {
     const r = await api("adminCreateCoupon", { key, code:$("#cp-code").value.trim(), uses:+$("#cp-uses").value || 1, days:+$("#cp-days").value || 0, value:+$("#cp-value").value || 0, note:$("#cp-note").value.trim() });
     if (!r.ok) { $("#cp-msg").innerHTML = `<div class="feedback no">${esc(errMsg(r.error))}</div>`; return; }
@@ -2853,7 +2974,7 @@ function uniPackRender() {
     const cur=VIEWS.find(v=>!document.querySelector(`[data-view-panel="${v}"]`).hidden);
     const views=[["uni","My university"],["must","Must-know checklist"],["cards","Flashcards"],["stats","My progress"]];
     if(typeof SYNC_URL!=="undefined"&&SYNC_URL)views.push(["class","Class leaderboard"]);
-    if(typeof signedIn==="function"&&signedIn())views.push(["account","My account"]);
+    if(typeof signedIn==="function"&&signedIn())views.push(["refer","Refer & earn £1"],["account","My account"]);
     if(store.get("idta-admin-key",""))views.push(["admin","Admin"]);
     return views.map(([v,l])=>`<button data-v="${v}" ${cur===v?'aria-current="page"':""}><span>${l}</span><span aria-hidden="true">›</span></button>`).join("")+
       `<hr><button data-a="share"><span>Share with classmates</span><span aria-hidden="true">↗</span></button><button data-a="theme"><span>Switch light / dark</span><span aria-hidden="true">›</span></button>`;

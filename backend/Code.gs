@@ -11,17 +11,20 @@
  */
 const APP = 'IDTA Revision';
 const SHEETS = {
-  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access'] },
+  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access', 'Exam first used', 'Referred by'] },
   sessions: { name: 'Sessions', cols: ['Token hash', 'User ID', 'Created', 'Expires'] },
   events:   { name: 'Events',   cols: ['Time', 'User ID', 'Name', 'Event', 'Topic', 'Question', 'Correct', 'Score', 'Out of', 'Detail'] },
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
   questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] },
   coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by', 'Value per use'] },
   certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] },
-  payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] }
+  payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] },
+  refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note'] },
+  payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] }
 };
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
-const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20 };
+const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22 };
+const REF_REWARD = 1, REF_DAYS = 10;   // £1 per friend who pays and studies on 10 different days
 const DEFAULT_DOMAINS = { 'myport.ac.uk': 'University of Portsmouth', 'port.ac.uk': 'University of Portsmouth' };
 const SESSION_DAYS = 30;
 const MAX_PROGRESS_CHARS = 45000;
@@ -93,7 +96,7 @@ function setCell_(sh, i, col, val) { sh.getRange(i + 1, col + 1).setValue(val); 
 function profile_(r) {
   return { id: String(r[U.id]), pid: pid_(r[U.id]), name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]),
     university: String(r[U.uni]), course: String(r[U.course]), lb: r[U.lb] === 'yes', created: String(r[U.created]),
-    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: !!r[U.exam] };
+    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: !!r[U.exam], examUsed: !!r[U.examUsed], refCode: refCode_(r[U.id]) };
 }
 function progress_(r) { try { return r[U.prog] ? JSON.parse(r[U.prog]) : null; } catch (e) { return null; } }
 function newSession_(uid) {
@@ -155,6 +158,8 @@ const API = {
       if (rowOf_(all.v, U.email, email) > 0) return fail_('email_taken');
       const id = Utilities.getUuid(), salt = Utilities.getUuid();
       const row = [id, now_(), name, mobile, email, uni, course, hashPw_(pw, salt), salt, b.lb === false ? 'no' : 'yes', '', '', now_(), '', '', now_()];
+      const ref = String(b.ref || '').toUpperCase().replace(/[^0-9A-F]/g, '');
+      if (ref.length === 8) { for (let i = 1; i < all.v.length; i++) if (refCode_(all.v[i][U.id]) === ref) { while (row.length < U.refBy) row.push(''); row[U.refBy] = String(all.v[i][U.id]); break; } }
       all.sh.appendRow(row);
       cache_().remove('leaderboard');
       return { ok: true, token: newSession_(id), profile: profile_(row), progress: null };
@@ -493,7 +498,7 @@ const API = {
     return { ok: true, exam: examCfg_() };
   }),
   adminSales: b => admin_(b, () => {
-    const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => r[3] === 'unlock' || r[3] === 'revoke');
+    const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => ['unlock', 'revoke', 'refund', 'payout', 'restore'].indexOf(r[3]) >= 0);
     const users = usersAll_().v.slice(1);
     return { ok: true, exam: examCfg_(), accounts: users.length, unlocked: users.filter(r => r[U.exam]).length,
       sales: ev.map(r => ({ ts: new Date(r[0]).getTime(), id: String(r[1]), name: String(r[2]).replace(/^'/, ''), kind: String(r[3]), amount: Number(r[7]) || 0, how: String(r[9] || '') })) };
@@ -585,6 +590,92 @@ const API = {
     return { ok: true };
   }),
 
+  /* ----- refunds: allowed only before the first course exam is started ----- */
+  examStarted: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    if (m.r[U.exam] && !m.r[U.examUsed]) setCell_(m.sh, m.i, U.examUsed, now_());
+    return { ok: true };
+  }),
+  myPurchase: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const mon = money_by_user_()[m.uid] || {};
+    const rf = sheet_('refunds').getDataRange().getValues().slice(1).filter(r => String(r[2]) === m.uid).pop();
+    return { ok: true, access: !!m.r[U.exam], how: String(m.r[U.exam] || ''), paid: mon.paid || 0, examUsed: !!m.r[U.examUsed],
+      refundable: !!m.r[U.exam] && !m.r[U.examUsed] && (mon.paid || 0) > 0 && !mon.refunded,
+      refund: rf ? { id: String(rf[0]), requested: String(rf[1]), amount: Number(rf[5]) || 0, status: String(rf[8]), note: String(rf[10] || '').replace(/^'/, '') } : null };
+  },
+  refundRequest: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const mon = money_by_user_()[m.uid] || {};
+    if (!m.r[U.exam] || !(mon.paid > 0) || mon.refunded) return fail_('not_refundable');
+    if (m.r[U.examUsed]) return fail_('exam_used');
+    const to = plain_(b.to, 100);
+    if (to.length < 5) return fail_('bad_refund_to');
+    const sh = sheet_('refunds');
+    if (sh.getDataRange().getValues().slice(1).some(r => String(r[2]) === m.uid && r[8] === 'pending')) return fail_('refund_pending');
+    const id = 'R' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
+    sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), mon.paid, text_(to, 100), text_(b.reason, 200), 'pending', '', '']);
+    setCell_(m.sh, m.i, U.exam, '');
+    sheet_('events').appendRow([now_(), m.uid, text_(m.r[U.name], 40), 'revoke', '', '', '', 0, '', 'refund requested ' + id]);
+    notifyAdmin_('refund request from ' + m.r[U.name], m.r[U.name] + ' (+' + m.r[U.mobile] + ') cancelled and asked for a refund of £' + mon.paid + '.\nSend it to: ' + to + (b.reason ? '\nReason: ' + plain_(b.reason, 200) : '') + '\n\nTheir exam access is already removed. After you send the money, open Admin -> Exam & coupons and click "Mark refunded".');
+    const row = m.r.slice(); row[U.exam] = '';
+    return { ok: true, profile: profile_(row) };
+  }),
+  adminRefunds: b => admin_(b, () => {
+    const list = sheet_('refunds').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ id: String(r[0]), requested: String(r[1]), name: String(r[3]).replace(/^'/, ''), mobile: String(r[4]).replace(/^'/, ''),
+      amount: Number(r[5]) || 0, to: String(r[6]).replace(/^'/, ''), reason: String(r[7] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, '') })).reverse();
+    return { ok: true, pending: list.filter(x => x.status === 'pending'), recent: list.filter(x => x.status !== 'pending').slice(0, 30) };
+  }),
+  // refunded = true: you sent the money back. false: decline and give their access back.
+  adminDecideRefund: b => admin_(b, () => {
+    const sh = sheet_('refunds'), v = sh.getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_refund');
+    if (v[i][8] !== 'pending') return fail_('already_decided');
+    const ok = !!b.refunded, note = text_(b.note, 120), uid = String(v[i][2]);
+    sh.getRange(i + 1, 9, 1, 3).setValues([[ok ? 'refunded' : 'declined', now_(), note]]);
+    const all = usersAll_(), u = rowOf_(all.v, U.id, uid);
+    if (ok) sheet_('events').appendRow([now_(), uid, text_(v[i][3], 40), 'refund', '', '', '', Number(v[i][5]) || 0, '', 'refund ' + v[i][0]]);
+    else if (u > 0) { setCell_(all.sh, u, U.exam, 'restored after declined refund · ' + now_()); sheet_('events').appendRow([now_(), uid, text_(v[i][3], 40), 'restore', '', '', '', 0, '', 'refund declined ' + v[i][0]]); }
+    if (u > 0) try { MailApp.sendEmail({ to: String(all.v[u][U.email]), subject: APP + (ok ? ': your refund has been sent' : ': about your refund request'),
+      body: 'Hi ' + all.v[u][U.name] + ',\n\n' + (ok ? 'Your refund of £' + v[i][5] + ' has been sent to ' + String(v[i][6]).replace(/^'/, '') + '.' : 'Your refund request was declined' + (note ? ': ' + plain_(note, 120) : '') + '. Your exam access has been restored.') }); } catch (e) {}
+    return { ok: true };
+  }),
+
+  /* ----- referrals: £1 when a friend you invited pays and studies on 10 different days ----- */
+  myReferrals: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const r = referralsOf_(m.uid);
+    return Object.assign({ ok: true, code: refCode_(m.uid), reward: REF_REWARD, days: REF_DAYS }, r);
+  },
+  referralPayout: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const r = referralsOf_(m.uid), to = plain_(b.to, 100);
+    if (r.available < REF_REWARD) return fail_('nothing_to_pay');
+    if (to.length < 5) return fail_('bad_refund_to');
+    const id = 'X' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
+    sheet_('payouts').appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), r.available, text_(to, 100), 'pending', '', '']);
+    notifyAdmin_('referral payout request from ' + m.r[U.name], m.r[U.name] + ' (+' + m.r[U.mobile] + ') asked for their referral reward of £' + r.available + '.\nSend it to: ' + to + '\n\nAfter you pay, open Admin -> Exam & coupons and click "Mark paid".');
+    return Object.assign({ ok: true }, referralsOf_(m.uid));
+  }),
+  adminReferrals: b => admin_(b, () => {
+    const users = usersAll_().v.slice(1), ids = {};
+    users.forEach(r => { if (r[U.refBy]) (ids[String(r[U.refBy])] = ids[String(r[U.refBy])] || []).push(r); });
+    const name = {}; users.forEach(r => name[String(r[U.id])] = String(r[U.name]));
+    const top = Object.keys(ids).map(uid => { const r = referralsOf_(uid); return { name: name[uid] || '(deleted)', invited: r.friends.length, qualified: r.qualified, earned: r.earned, paid: r.paidOut, pending: r.pending }; }).sort((a, b) => b.qualified - a.qualified || b.invited - a.invited);
+    const list = sheet_('payouts').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ id: String(r[0]), requested: String(r[1]), name: String(r[3]).replace(/^'/, ''), mobile: String(r[4]).replace(/^'/, ''),
+      amount: Number(r[5]) || 0, to: String(r[6]).replace(/^'/, ''), status: String(r[7]), decided: String(r[8] || ''), note: String(r[9] || '').replace(/^'/, '') })).reverse();
+    return { ok: true, reward: REF_REWARD, days: REF_DAYS, referrers: top, pending: list.filter(x => x.status === 'pending'), recent: list.filter(x => x.status !== 'pending').slice(0, 30) };
+  }),
+  adminDecidePayout: b => admin_(b, () => {
+    const sh = sheet_('payouts'), v = sh.getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_payout');
+    if (v[i][7] !== 'pending') return fail_('already_decided');
+    const ok = !!b.paid, note = text_(b.note, 120);
+    sh.getRange(i + 1, 8, 1, 3).setValues([[ok ? 'paid' : 'declined', now_(), note]]);
+    if (ok) sheet_('events').appendRow([now_(), String(v[i][2]), text_(v[i][3], 40), 'payout', '', '', '', Number(v[i][5]) || 0, '', 'referral payout ' + v[i][0]]);
+    return { ok: true };
+  }),
+
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
     if (hit) return JSON.parse(hit);
@@ -618,11 +709,38 @@ function examCfg_() {
   let c = null;
   try { c = JSON.parse(props_().getProperty('EXAM_CFG') || 'null'); } catch (e) {}
   c = c || {};
-  return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '' };
+  return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '', refReward: REF_REWARD, refDays: REF_DAYS };
 }
 function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
 function sale_(uid, name, amount, how) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, '', text_(how, 60)]); }
 function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, '') }; }
+function refCode_(uid) { return pid_(uid).slice(0, 8).toUpperCase(); }
+function notifyAdmin_(subject, body) {
+  try { const to = props_().getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail(); if (to) MailApp.sendEmail({ to: to, subject: APP + ': ' + subject, body: body }); } catch (e) {}
+}
+// Per student: amount paid for the latest unlock, whether it was refunded, and the set of days they studied.
+function money_by_user_() {
+  const out = {};
+  sheet_('events').getDataRange().getValues().slice(1).forEach(r => {
+    const uid = String(r[1]), ev = r[3]; if (!uid) return;
+    const o = out[uid] = out[uid] || { paid: 0, refunded: false, days: {} };
+    if (ev === 'unlock') { o.paid = Number(r[7]) || 0; o.refunded = false; }
+    else if (ev === 'refund') o.refunded = true;
+    else if (ev === 'q' || ev === 'mock' || ev === 'lab') { const t = new Date(r[0]); if (!isNaN(t)) o.days[t.toISOString().slice(0, 10)] = 1; }
+  });
+  return out;
+}
+function referralsOf_(uid) {
+  const users = usersAll_().v.slice(1), mon = money_by_user_();
+  const friends = users.filter(r => String(r[U.refBy]) === uid).map(r => {
+    const o = mon[String(r[U.id])] || { paid: 0, refunded: false, days: {} }, paid = o.paid > 0 && !o.refunded && !!r[U.exam], days = Object.keys(o.days).length;
+    return { name: String(r[U.name]).split(' ')[0], joined: String(r[U.created]), paid: paid, days: Math.min(days, REF_DAYS), qualified: paid && days >= REF_DAYS };
+  });
+  const qualified = friends.filter(f => f.qualified).length, earned = qualified * REF_REWARD;
+  let paidOut = 0, pending = 0;
+  sheet_('payouts').getDataRange().getValues().slice(1).forEach(r => { if (String(r[2]) !== uid) return; if (r[7] === 'paid') paidOut += Number(r[5]) || 0; else if (r[7] === 'pending') pending += Number(r[5]) || 0; });
+  return { friends: friends, qualified: qualified, earned: earned, paidOut: paidOut, pending: pending, available: Math.max(0, earned - paidOut - pending) };
+}
 function proofFolder_() {
   const p = props_(), id = p.getProperty('PROOF_FOLDER');
   if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
@@ -719,7 +837,7 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();
