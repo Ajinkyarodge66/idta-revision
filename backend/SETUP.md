@@ -61,6 +61,12 @@ Students choose their **country** at sign-up, which also sets the phone code. So
 
 **Prices by country** (Admin → Exam & coupons): each region has a currency, an amount, the label students see (e.g. ₹199) and optional "how to pay" text, for example your UPI ID for India. Defaults: UK £3 · India ₹199 · Pakistan Rs 499 · Bangladesh ৳249 · Nigeria ₦1,500 · UAE AED 12 · USA/Canada $3.99 · Europe €3.49 · everyone else $2.99. Payments are recorded in their own currency. Sales totals are converted to pounds at approximate rates (`TO_GBP` in `Code.gs`). Analytics can be filtered by website and shows sign-ups by country.
 
+## JobReady AI levels and capstone
+
+JobReady AI has three levels: **Foundation** (the 26 core lessons), **Professional** (linear algebra, probability and statistics, A/B testing, training deep networks, computer vision, transformers) and **Advanced** (LLM internals, fine-tuning and RAG evaluation, agents and safety, data pipelines and SQL, deployment and monitoring, ML system design). That's 38 lessons and 52 extra questions. Foundation certificates come from Papers 1–3 or the random exam; the **Professional exam** and **Advanced exam** (30 questions, 60 minutes) give their own certificates at 70%+.
+
+**Capstone projects:** students submit a title, a public GitHub link, an optional demo link and a summary in **Career hub → Capstone**. You get an email. Mark it out of 100 in **Admin → Capstones** using the rubric (framing 15, data 20, modelling & evaluation 25, deployment 15, communication 15, responsible AI 10) and add feedback. A mark of 50+ issues a verifiable certificate automatically (Merit 60+, Distinction 70+), and the student is emailed either way. Submissions are stored in the **Capstones** sheet.
+
 ## Analytics and student tracker
 
 **Admin → Analytics** shows, for the last 7, 30 or 90 days or 12 months:

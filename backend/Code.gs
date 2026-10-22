@@ -22,6 +22,7 @@ const SHEETS = {
   refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note', 'Currency'] },
   payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] },
   visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning', 'Site'] },
+  capstones:{ name: 'Capstones', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Title', 'Repository', 'Demo', 'Summary', 'Status', 'Mark', 'Feedback', 'Marked', 'Certificate ID'] },
   proctor:  { name: 'Exam photos', cols: ['ID', 'Time', 'User ID', 'Name', 'Exam session', 'Exam', 'Reason', 'Drive file ID'] }
 };
 const PHOTO_DAYS = 30;
@@ -49,7 +50,7 @@ function regions_() {
   return Array.isArray(r) && r.length ? r : DEFAULT_REGIONS;
 }
 function regionOf_(country) { const rs = regions_(), c = country_(country); return rs.find(x => x.id !== 'OTHER' && (x.countries || []).indexOf(c) >= 0) || rs.find(x => x.id === 'OTHER') || rs[0]; }   // exam photos are deleted automatically after this many days
-const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
+const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops', 'stats', 'dl', 'llm', 'prod'];
 const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22, src: 23, dev: 24, site: 25, country: 26 };
 const REF_REWARD = 1, REF_DAYS = 10;   // £1 per friend who pays and studies on 10 different days
 const DEFAULT_DOMAINS = { 'myport.ac.uk': 'University of Portsmouth', 'port.ac.uk': 'University of Portsmouth' };
@@ -829,6 +830,48 @@ const API = {
     try { return { ok: true, image: Utilities.base64Encode(DriveApp.getFileById(String(v[i][7])).getBlob().getBytes()) }; } catch (e) { return fail_('no_image'); }
   }),
 
+  /* ----- capstone projects: students submit, the organiser marks; 50+ issues a certificate ----- */
+  capstoneSubmit: b => withLock_(() => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const title = text_(b.title, 80), repo = String(b.repo || '').trim(), demo = String(b.demo || '').trim(), summary = multiline_(b.summary, 1500);
+    if (title.length < 4 || !/^https:\/\/(www\.)?github\.com\/[^\s]{3,200}$/.test(repo) || (demo && !/^https?:\/\/\S{4,300}$/.test(demo)) || summary.length < 100) return fail_('bad_capstone');
+    const sh = sheet_('capstones'), v = sh.getDataRange().getValues();
+    if (v.slice(1).some(r => String(r[2]) === m.uid && r[8] === 'pending')) return fail_('capstone_pending');
+    const id = 'K' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
+    sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), title, text_(repo, 220), text_(demo, 320), summary, 'pending', '', '', '', '']);
+    notifyAdmin_('capstone to mark from ' + m.r[U.name], m.r[U.name] + ' submitted "' + plain_(title, 80) + '".\nRepository: ' + repo + (demo ? '\nDemo: ' + demo : '') + '\n\nMark it in Admin -> Capstones.');
+    return { ok: true };
+  }),
+  myCapstone: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const r = sheet_('capstones').getDataRange().getValues().slice(1).filter(x => String(x[2]) === m.uid).pop();
+    return { ok: true, capstone: r ? { id: String(r[0]), submitted: String(r[1]), title: String(r[4]).replace(/^'/, ''), status: String(r[8]), mark: r[9] === '' ? null : Number(r[9]), feedback: String(r[10] || '').replace(/^'/, ''), certId: String(r[12] || '') } : null };
+  },
+  adminCapstones: b => admin_(b, () => {
+    const list = sheet_('capstones').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ id: String(r[0]), submitted: String(r[1]), name: String(r[3]).replace(/^'/, ''), title: String(r[4]).replace(/^'/, ''),
+      repo: String(r[5]).replace(/^'/, ''), demo: String(r[6] || '').replace(/^'/, ''), summary: String(r[7]).replace(/^'/, ''), status: String(r[8]), mark: Number(r[9]) || 0, graded: String(r[11] || '') })).reverse();
+    return { ok: true, pending: list.filter(x => x.status === 'pending'), recent: list.filter(x => x.status !== 'pending').slice(0, 50) };
+  }),
+  adminGradeCapstone: b => admin_(b, () => {
+    const sh = sheet_('capstones'), v = sh.getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_capstone');
+    if (v[i][8] !== 'pending') return fail_('already_decided');
+    const mark = Math.max(0, Math.min(100, Math.round(Number(b.mark)))), feedback = multiline_(b.feedback, 1500);
+    if (!isFinite(mark)) return fail_('bad_capstone');
+    const band = mark >= 70 ? 'Distinction' : mark >= 60 ? 'Merit' : mark >= 50 ? 'Pass' : '';
+    let certId = '';
+    const all = usersAll_(), u = rowOf_(all.v, U.id, String(v[i][2]));
+    if (band) {
+      const cs = sheet_('certs'), cv = cs.getDataRange().getValues();
+      do { certId = 'C' + sha_(Utilities.getUuid()).slice(0, 9).toUpperCase(); } while (rowOf_(cv, 0, certId) > 0);
+      cs.appendRow([certId, now_(), String(v[i][2]), text_(v[i][3], 40), mark, 100, text_('Capstone · ' + band + ': ' + String(v[i][4]).replace(/^'/, ''), 60), u > 0 ? site_(all.v[u][U.site]) : 'global']);
+    }
+    sh.getRange(i + 1, 9, 1, 5).setValues([['graded', mark, feedback, now_(), certId]]);
+    if (u > 0) try { MailApp.sendEmail({ to: String(all.v[u][U.email]), subject: brand_(all.v[u][U.site]) + ': your capstone has been marked',
+      body: 'Hi ' + all.v[u][U.name] + ',\n\nYour capstone "' + String(v[i][4]).replace(/^'/, '') + '" scored ' + mark + '/100' + (band ? ' (' + band + '). Your certificate is in the Career hub.' : '. Use the feedback to improve it and submit again.') + (feedback ? '\n\nFeedback:\n' + feedback.replace(/^'/, '') : '') }); } catch (e) {}
+    return { ok: true, certId: certId };
+  }),
+
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
     if (hit) return JSON.parse(hit);
@@ -864,6 +907,7 @@ function examCfg_() {
   c = c || {};
   return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '', refReward: REF_REWARD, refDays: REF_DAYS, regions: regions_().map(r => ({ id: r.id, name: r.name, countries: r.countries || [], cur: r.cur, amount: r.amount, label: r.label, how: r.how || '' })) };
 }
+function multiline_(v, max) { const t = String(v == null ? '' : v).split(/\r?\n/).map(l => plain_(l, 400)).join('\n').trim().slice(0, max); return /^[=+\-@]/.test(t) ? "'" + t : t; }
 function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
 function sale_(uid, name, amount, how, cur) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, cur || 'GBP', text_(how, 60)]); }
 function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, ''), site: site_(r[7]) }; }
@@ -1005,7 +1049,7 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts', 'visits', 'proctor'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts', 'visits', 'proctor', 'capstones'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();
