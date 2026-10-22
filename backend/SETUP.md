@@ -43,6 +43,14 @@ Lessons, Practice, Calc Lab and flashcards are free for everyone, and verified u
 
 Codes and who used them are stored in the **Coupons** sheet. The lock is on by default once this version of `Code.gs` is deployed.
 
+## Exam camera photos
+
+Every exam (course exams, papers, topic tests, quick mocks and the Portsmouth module mock) needs the camera. Before an exam, students see what's photographed, why, who sees it and that photos are deleted after 30 days, and they tick to agree. Their preview and a red "Camera on" dot stay visible throughout. Without a working camera the exam won't start, and the screen says how to fix it. If the camera turns off mid-exam, the exam pauses until it's back on; the timer keeps running.
+
+Photos are taken at the start, every 5 minutes, when the student comes back from another tab, and at the end. They're saved as small JPEGs in a private Drive folder, *IDTA Revision exam photos (private, auto-deleted)*, which the `setup` log links to. To see them, open **Admin → Overview → Students**, click a name, then **Exam photos → View photos**. Each exam shows its score and how many times the student left the tab.
+
+Photos older than `PHOTO_DAYS` (30) are deleted automatically a few times a day. You can also run `cleanPhotos` from the editor. Deleting an account deletes that student's photos.
+
 ## Analytics and student tracker
 
 **Admin → Analytics** shows, for the last 7, 30 or 90 days or 12 months:
@@ -77,6 +85,7 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 | **Payments** | Uploaded payment screenshots: ID, time, student, mobile, amount, reference, Drive file ID, status (pending/approved/rejected), decision time and reason |
 | **Refunds** | Refund requests: student, amount, where to send it, reason, status (pending/refunded/declined) |
 | **Referral payouts** | Referral reward requests: student, amount, where to send it, status (pending/paid/declined) |
+| **Exam photos** | One row per photo: time, student, exam session, exam name, reason (start, timer, tab, resume, end), Drive file ID |
 | **Visits** | One anonymous row per browser session: time, source, device type, logged in or not, returning or not |
 | **Certificates** | Certificates students claimed: ID, date, user, name, score and exam. Anyone can check one at `…/#cert=ID` |
 

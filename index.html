@@ -404,6 +404,19 @@ td.neg{color:var(--bad)}
 .timeline{list-style:none;margin:0;padding:0}.timeline li{display:grid;grid-template-columns:8.5rem 1fr;gap:.8rem;padding:.45rem 0;border-bottom:1px solid var(--line)}.timeline li:last-child{border-bottom:0}.timeline span{color:var(--muted)}
 ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
 @media (max-width:760px){.mini-grid4,.dev-cols{grid-template-columns:1fr}.fn-row{grid-template-columns:1fr 5.5rem}.fn-track{grid-column:1/-1;grid-row:2}.timeline li{grid-template-columns:1fr}}
+/* ---- exam camera ---- */
+.cam-gate{max-width:40rem}.cam-gate h1{margin:.3rem 0 .6rem}.cam-gate ul{padding-left:1.2rem}.cam-gate li{margin:.35rem 0}
+.cam-ic{font-size:2rem}
+.cam-dock{position:fixed;left:16px;bottom:16px;z-index:60;width:132px;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 6px 20px rgba(0,0,0,.25);border:2px solid var(--surface)}
+.cam-dock video{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;transform:scaleX(-1)}
+.cam-rec{position:absolute;left:6px;top:6px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:99px}
+.cam-rec i{width:8px;height:8px;border-radius:50%;background:#e5484d}
+@media (prefers-reduced-motion:no-preference){.cam-rec i{animation:blink 1.6s ease-in-out infinite}@keyframes blink{50%{opacity:.35}}}
+@media (max-width:760px){.cam-dock{top:6px;bottom:auto;left:auto;right:72px;width:56px;border-width:1px;border-radius:8px;box-shadow:none}.cam-rec{font-size:0;gap:0;padding:3px;left:3px;top:3px}}
+.ph-sess{border-top:1px solid var(--line);padding:.7rem 0}.ph-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center}.ph-head span{color:var(--muted);font-size:.9rem;flex:1}
+.ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));gap:.6rem;margin-top:.5rem}
+.ph-grid figure{margin:0}.ph-grid img{display:block;width:100%;border-radius:8px;border:1px solid var(--line)}.ph-grid figcaption{font-size:.75rem;color:var(--muted);margin-top:.2rem}
+.ph-miss{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:var(--code-bg);border-radius:8px;color:var(--muted);font-size:.8rem}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -590,6 +603,7 @@ ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
     <h2 class="land-h">Questions</h2>
     <div class="faq">
       <details><summary>Is it free?</summary><p>The whole course is free: every lesson, Practice question, Calc Lab drill, flashcard and the study coach. The timed course exams (random exam, Papers 1–3, topic tests and certificates) unlock with a one-off code. Verified university module packs, including their mock exam, are free. There are no ads.</p></details>
+      <details><summary>Why do exams use my camera?</summary><p>To keep results and certificates fair. During an exam your camera stays on with a visible preview, and a photo is taken at the start, every 5 minutes and when you come back from another tab. Photos are stored privately, seen only by the organiser and deleted automatically after 30 days. No sound is recorded. You agree to this before each exam.</p></details>
       <details><summary>Can I get a refund?</summary><p>Yes, if you haven't started a course exam. Cancel in <b>My account</b> any time before you start your first exam and you get the full amount back. Once you start an exam, the payment is non-refundable. You agree to this before paying.</p></details>
       <details><summary>How does Refer &amp; earn work?</summary><p>Share your personal link from the <b>Refer &amp; earn</b> tab. You earn £1 for every friend who signs up with it, unlocks the course exams and studies on 10 different days. Request your reward in the app and the organiser sends it to you.</p></details>
       <details><summary>How do certificates work?</summary><p>Pass a full 30-question course exam with 70% or more and you can claim a certificate with your name, score and a unique ID. Anyone can check it with its verification link. It records a practice result; it isn't a university qualification.</p></details>
@@ -1106,7 +1120,54 @@ function courseExamGrid(locked){
   </div>`;
 }
 function noteExamStart(){try{const a=AUTH.get();if(MK.mode==="pack"||!signedIn()||!a.profile.examAccess||a.profile.examUsed)return;AUTH.set({...a,profile:{...a.profile,examUsed:true}});api("examStarted",{token:AUTH.token()},{retries:2})}catch(e){}}
-function startMock(n,mins,items,meta){if(MK.mode!=="pack"&&examLocked()){MK.state="intro";return mockRender()}noteExamStart();MK.meta=meta||{k:MK.mode==="pack"?"pack":n>=30?"random":"quick",label:MK.mode==="pack"?EX().title:n>=30?"Random exam":"Quick mock"};MK.start=Date.now();MK.n=n;MK.mins=mins;MK.items=items||pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;mockRender()}
+/* ---------- exam camera: students agree first, see their preview the whole time; photos are deleted after 30 days ---------- */
+const CAM={stream:null,timer:null,busy:false};
+const PHOTO_MIN=5;
+function camNeeded(){try{return !!SYNC_URL&&signedIn()}catch(e){return false}}
+function camStop(){clearInterval(CAM.timer);CAM.timer=null;if(CAM.stream)CAM.stream.getTracks().forEach(t=>{t.onended=null;t.stop()});CAM.stream=null;const d=document.getElementById("cam-dock");if(d)d.remove()}
+async function camStart(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw Object.assign(new Error("unsupported"),{name:"NotSupportedError"});
+  const st=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:"user"},audio:false});
+  CAM.stream=st;st.getVideoTracks().forEach(t=>t.onended=()=>{CAM.stream=null;const d=document.getElementById("cam-dock");if(d)d.remove();if(MK.state==="run"){MK.camLost=true;mockRender()}});
+  let d=document.getElementById("cam-dock");
+  if(!d){d=document.createElement("div");d.id="cam-dock";d.className="cam-dock";d.innerHTML=`<video autoplay muted playsinline aria-label="Your camera preview"></video><span class="cam-rec"><i aria-hidden="true"></i>Camera on</span>`;document.body.appendChild(d)}
+  const v=d.querySelector("video");v.srcObject=st;try{await v.play()}catch(e){}
+  return st;
+}
+function camShot(reason){
+  if(!CAM.stream||!MK.session)return;
+  const v=document.querySelector("#cam-dock video");
+  if(!v||!v.videoWidth){if(reason!=="retry-x")setTimeout(()=>camShot(reason==="start"?"start":reason),800);return}
+  const w=320,h=Math.round(w*v.videoHeight/v.videoWidth),c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(v,0,0,w,h);
+  const img=c.toDataURL("image/jpeg",.6).split(",")[1];
+  api("proctorShot",{token:AUTH.token(),session:MK.session,exam:(MK.meta&&MK.meta.label)||"",reason,image:img},{retries:2});
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&MK.state==="run"&&CAM.stream)setTimeout(()=>camShot("tab"),400)});
+function camErrText(e){const n=e&&e.name;return n==="NotAllowedError"||n==="SecurityError"?"Camera access is blocked. Click the 🔒 or camera icon in your browser's address bar, allow the camera for this site, then try again.":n==="NotFoundError"||n==="OverconstrainedError"?"No camera was found. Use a phone or laptop with a working camera.":n==="NotReadableError"?"Your camera is being used by another app (for example Zoom or Teams). Close it and try again.":n==="NotSupportedError"?"This browser can't use the camera. Open the app in an up-to-date Chrome, Edge, Safari or Firefox.":"The camera couldn't be started. Check it's connected and try again."}
+async function camGo(){const ps=MK.pendingStart;if(!ps)return;MK.pendingStart=null;startMock(...ps)}
+function camGate(err){
+  const root=$("#mock-root");
+  root.innerHTML=`<div class="card cam-gate"><div class="cam-ic" aria-hidden="true">📷</div><h1>This exam uses your camera</h1>
+  <ul><li>Your camera stays on during the exam, with a small preview so you can always see it.</li><li>A photo is taken when you start, every ${PHOTO_MIN} minutes, and when you come back after switching tabs. This keeps results and certificates fair.</li><li>Photos are stored privately in the organiser's Google Drive, seen only by the organiser, and <b>deleted automatically after 30 days</b>. No sound is recorded.</li><li>You can't take the exam without the camera.</li></ul>
+  <label class="check"><input type="checkbox" id="cam-ok" ${store.get("idta-cam-ok",false)?"checked":""}><span>I agree to camera photos during this exam, as described above.</span></label>
+  <div id="cam-msg" role="status">${err?`<div class="feedback no"><b>Camera not available</b>${esc(camErrText(err))}</div>`:""}</div>
+  <div class="qnav" style="justify-content:flex-start;gap:.5rem"><button class="btn primary" id="cam-go">Turn on camera and start</button><button class="btn" id="cam-back">Back</button></div></div>`;
+  $("#cam-back").onclick=()=>{MK.pendingStart=null;camStop();MK.state="intro";mockRender()};
+  $("#cam-go").onclick=e=>{if(!$("#cam-ok").checked){$("#cam-msg").innerHTML=`<div class="feedback no">Tick the box to agree before starting.</div>`;return}
+    store.set("idta-cam-ok",true);busy(e.target,"Starting camera…",async()=>{try{await camStart();camGo()}catch(x){camGate(x)}})};
+}
+function startMock(n,mins,items,meta){if(MK.mode!=="pack"&&examLocked()){MK.state="intro";return mockRender()}
+  if(camNeeded()&&!CAM.stream){
+    MK.pendingStart=[n,mins,items,meta];
+    // Agreed before and the browser already allows the camera: start straight away (the preview and recording dot still show).
+    const auto=store.get("idta-cam-ok",false)&&navigator.permissions&&navigator.permissions.query?navigator.permissions.query({name:"camera"}).then(p=>p.state==="granted").catch(()=>false):Promise.resolve(false);
+    auto.then(ok=>{if(!MK.pendingStart)return;if(!ok)return camGate();camStart().then(camGo).catch(x=>camGate(x))});
+    return;
+  }
+  noteExamStart();MK.meta=meta||{k:MK.mode==="pack"?"pack":n>=30?"random":"quick",label:MK.mode==="pack"?EX().title:n>=30?"Random exam":"Quick mock"};MK.start=Date.now();MK.n=n;MK.mins=mins;MK.items=items||pickMock(n);MK.i=0;MK.flags=new Set();MK.end=Date.now()+mins*60*1000;MK.state="run";MK.confirm=false;MK.saved=false;MK.camLost=false;
+  MK.session=CAM.stream?Array.from(crypto.getRandomValues(new Uint8Array(6)),x=>x.toString(16).padStart(2,"0")).join(""):"";
+  mockRender();
+  if(CAM.stream){camShot("start");clearInterval(CAM.timer);CAM.timer=setInterval(()=>{if(MK.state==="run")camShot("timer")},PHOTO_MIN*60000)}}
 function examLockHTML(c){
   const how=String(c.how||"").trim();
   return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exams · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the random exam, Papers 1–3, topic tests and quick mocks, with unlimited attempts and certificates. Lessons, Practice, Calc Lab and flashcards stay free.</p></div></div>
@@ -1167,6 +1228,7 @@ function mockRender(){
   clearInterval(MK.timer);
   const N=MK.items.length||MK.n;
   if(MK.state==="intro"){
+    if(!MK.pendingStart)camStop();
     const best=store.get("idta-best",null);
     const hist=store.get("idta-mocks",[]);
     if(!MK.chosen||(MK.mode==="pack"&&!hasPackExam()))MK.mode=hasPackExam()?"pack":"course";
@@ -1184,6 +1246,12 @@ function mockRender(){
     }
     $("#mk-start").onclick=()=>startMock(EX().n,EX().minutes);
     $("#mk-quick").onclick=()=>startMock(10,20);
+    return;
+  }
+  if(MK.state==="run"&&MK.camLost&&camNeeded()){
+    root.innerHTML=`<div class="card cam-gate"><div class="cam-ic" aria-hidden="true">📷</div><h1>Your camera turned off</h1><p>Turn it back on to carry on with your exam. The timer is still running.</p><div id="cam-msg"></div><button class="btn primary" id="cam-re">Turn camera back on</button></div>`;
+    $("#cam-re").onclick=e=>busy(e.target,"Starting camera…",async()=>{try{await camStart();MK.camLost=false;mockRender();camShot("resume");clearInterval(CAM.timer);CAM.timer=setInterval(()=>{if(MK.state==="run")camShot("timer")},PHOTO_MIN*60000)}catch(x){$("#cam-msg").innerHTML=`<div class="feedback no">${esc(camErrText(x))}</div>`}});
+    const tick=()=>{if(MK.end-Date.now()<=0){MK.state="done";MK.camLost=false;mockRender()}};MK.timer=setInterval(tick,1000);
     return;
   }
   if(MK.state==="run"){
@@ -1213,6 +1281,7 @@ function mockRender(){
   // results
   const score=MK.items.filter(correct).length;
   if(!MK.saved){
+    if(CAM.stream){camShot("end");setTimeout(camStop,300)}else camStop();
     MK.items.forEach(x=>{markMiss(x.q.id,!correct(x));recordHist(x.q.id,correct(x))});
     const meta=MK.meta||{},h=store.get("idta-mocks",[]);
     MK.prevBest=(()=>{const xs=h.filter(m=>m.n===N&&(m.k||"")===(meta.k||"")&&(m.p||"")===(meta.p||""));return xs.length?Math.max(...xs.map(m=>m.s)):null})();
@@ -1647,7 +1716,7 @@ addEventListener("online", () => { flush(); if (signedIn()) saveProgress(); });
 const _recordHist = recordHist, _recordLab = recordLab;
 recordHist = (id, ok) => { _recordHist(id, ok); track({ t:"q", id, topic:Q[id] && Q[id].t, ok }); };
 recordLab = (k, ok) => { _recordLab(k, ok); track({ t:"lab", k, topic:GEN[k] && GEN[k].t, ok }); };
-const trackMock = (s, n) => track({ t:"mock", s, n });
+const trackMock = (s, n) => track({ t:"mock", s, n, k:MK.session || "" });
 
 /* ---------- sign-in screens ---------- */
 const CC = [["44","🇬🇧 +44"],["91","🇮🇳 +91"],["92","🇵🇰 +92"],["880","🇧🇩 +880"],["94","🇱🇰 +94"],["977","🇳🇵 +977"],["234","🇳🇬 +234"],["233","🇬🇭 +233"],["86","🇨🇳 +86"],["971","🇦🇪 +971"],["966","🇸🇦 +966"],["60","🇲🇾 +60"],["353","🇮🇪 +353"],["1","🇺🇸 +1"]];
@@ -2201,8 +2270,20 @@ async function adminStudentView(id) {
     <li>Payments uploaded: ${d.payments.length ? d.payments.map(x => `${fmt(x.at)} (${x.status})`).join(", ") : "none"}</li>
     <li>Refunds: ${d.refunds.length ? d.refunds.map(x => `${money(x.amount)} ${x.status} ${fmt(x.at)}`).join(", ") : "none"}</li>
     <li>Certificates: ${d.certs.length ? d.certs.map(x => `${esc(x.exam)} ${x.score}/${x.n} (${esc(x.id)})`).join(", ") : "none"}</li>
-    <li>Referrals: ${rf.friends.length} friend${rf.friends.length === 1 ? "" : "s"} joined, ${rf.qualified} qualified, earned ${money(rf.earned)}, paid ${money(rf.paidOut)}</li></ul></div>`;
+    <li>Referrals: ${rf.friends.length} friend${rf.friends.length === 1 ? "" : "s"} joined, ${rf.qualified} qualified, earned ${money(rf.earned)}, paid ${money(rf.paidOut)}</li></ul></div>
+  <div class="card" style="margin-top:1rem"><h2>Exam photos</h2><div id="st-photos"><p class="hint">Loading…</p></div></div>`;
   $("#st-back").onclick = adminRender;
+  api("adminProctor", { key, id }, { retries:1 }).then(pr => {
+    const box = $("#st-photos"); if (!box) return;
+    if (!pr.ok) { box.innerHTML = `<p class="hint">${pr.error === "unknown_action" ? "Update Code.gs to see exam photos." : esc(errMsg(pr.error))}</p>`; return; }
+    const reasonTxt = { start:"start", timer:"every 5 min", tab:"came back from another tab", resume:"camera back on", end:"finished" };
+    box.innerHTML = pr.sessions.length ? `<p class="hint">Kept for ${pr.days} days, then deleted automatically.</p>` + pr.sessions.map((x, i) => `<div class="ph-sess"><div class="ph-head"><b>${esc(x.exam || "Exam")}</b><span>${new Date(x.start).toLocaleString([], { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })} · ${x.shots.length} photo${x.shots.length === 1 ? "" : "s"}${x.score ? " · score " + esc(x.score) : ""}${x.tab ? ` · <span class="badge warn">left the tab ${x.tab}×</span>` : ""}</span><button class="btn small" data-phs="${i}">View photos</button></div><div class="ph-grid" id="phg-${i}"></div></div>`).join("") : `<p class="hint">No exam photos for this student.</p>`;
+    box.querySelectorAll("[data-phs]").forEach(b => b.onclick = () => busy(b, "Loading…", async () => {
+      const sx = pr.sessions[+b.dataset.phs], g = $("#phg-" + b.dataset.phs);
+      for (const sh of sx.shots) { const r = await api("adminProctorImage", { key, id:sh.id }); g.insertAdjacentHTML("beforeend", `<figure>${r.ok ? `<img src="data:image/jpeg;base64,${r.image}" alt="Exam photo">` : `<div class="ph-miss">deleted</div>`}<figcaption>${new Date(sh.time).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })} · ${reasonTxt[sh.reason] || sh.reason}</figcaption></figure>`); }
+      b.hidden = true;
+    }));
+  });
 }
 async function adminExam() {
   const key = store.get("idta-admin-key", ""), body = $("#ad-body");

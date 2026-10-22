@@ -21,8 +21,10 @@ const SHEETS = {
   payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] },
   refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note'] },
   payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] },
-  visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning'] }
+  visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning'] },
+  proctor:  { name: 'Exam photos', cols: ['ID', 'Time', 'User ID', 'Name', 'Exam session', 'Exam', 'Reason', 'Drive file ID'] }
 };
+const PHOTO_DAYS = 30;   // exam photos are deleted automatically after this many days
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
 const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22, src: 23, dev: 24 };
 const REF_REWARD = 1, REF_DAYS = 10;   // £1 per friend who pays and studies on 10 different days
@@ -296,6 +298,8 @@ const API = {
     const pw = pw_(b.pw);
     if (!pw || hashPw_(pw, m.r[U.salt]) !== m.r[U.hash]) return fail_('wrong_password');
     killSessions_(m.uid);
+    sheet_('proctor').getDataRange().getValues().slice(1).forEach(r => { if (String(r[2]) === m.uid) try { DriveApp.getFileById(String(r[7])).setTrashed(true); } catch (e) {} });
+    dropRows_(sheet_('proctor'), r => String(r[2]) !== m.uid);
     dropRows_(sheet_('events'), r => String(r[1]) !== m.uid);
     dropRows_(m.sh, r => String(r[U.id]) !== m.uid);
     cache_().remove('leaderboard');
@@ -755,6 +759,37 @@ const API = {
       referrals: referralsOf_(uid) };
   }),
 
+  /* ----- exam camera photos (students agree before every exam; deleted after PHOTO_DAYS) ----- */
+  proctorShot: b => {
+    const m = me_(b); if (!m) return fail_('auth');
+    const data = String(b.image || ''), session = String(b.session || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 16);
+    if (session.length < 6 || data.length < 200 || data.length > 400000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail_('bad_image');
+    const key = 'shot:' + m.uid;
+    if (tooMany_(key, 300)) return fail_('too_many_attempts');
+    bump_(key, 86400);
+    const reason = ['start', 'timer', 'tab', 'resume', 'end'].indexOf(b.reason) >= 0 ? b.reason : 'timer';
+    const id = 'S' + sha_(Utilities.getUuid()).slice(0, 9).toUpperCase();
+    const file = photoFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(data), 'image/jpeg', id + '-' + session + '-' + reason + '.jpg'));
+    sheet_('proctor').appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), session, text_(b.exam, 60), reason, file.getId()]);
+    if (!cache_().get('photoclean')) { cache_().put('photoclean', '1', 21600); try { cleanPhotos(); } catch (e) {} }
+    return { ok: true };
+  },
+  adminProctor: b => admin_(b, () => {
+    const uid = String(b.id || ''), by = {};
+    sheet_('proctor').getDataRange().getValues().slice(1).filter(r => String(r[2]) === uid).forEach(r => {
+      const k = String(r[4]), o = by[k] = by[k] || { session: k, exam: String(r[5]).replace(/^'/, ''), start: String(r[1]), shots: [], tab: 0 };
+      o.shots.push({ id: String(r[0]), time: String(r[1]), reason: String(r[6]) }); if (r[6] === 'tab') o.tab++;
+    });
+    const score = {};
+    sheet_('events').getDataRange().getValues().slice(1).forEach(r => { if (String(r[1]) === uid && r[3] === 'mock' && r[9]) score[String(r[9])] = r[7] + '/' + r[8]; });
+    return { ok: true, days: PHOTO_DAYS, sessions: Object.keys(by).map(k => Object.assign(by[k], { score: score[k] || '' })).reverse() };
+  }),
+  adminProctorImage: b => admin_(b, () => {
+    const v = sheet_('proctor').getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
+    if (i < 0) return fail_('no_image');
+    try { return { ok: true, image: Utilities.base64Encode(DriveApp.getFileById(String(v[i][7])).getBlob().getBytes()) }; } catch (e) { return fail_('no_image'); }
+  }),
+
   leaderboard: () => {
     const hit = cache_().get('leaderboard');
     if (hit) return JSON.parse(hit);
@@ -821,6 +856,19 @@ function referralsOf_(uid) {
   let paidOut = 0, pending = 0;
   sheet_('payouts').getDataRange().getValues().slice(1).forEach(r => { if (String(r[2]) !== uid) return; if (r[7] === 'paid') paidOut += Number(r[5]) || 0; else if (r[7] === 'pending') pending += Number(r[5]) || 0; });
   return { friends: friends, qualified: qualified, earned: earned, paidOut: paidOut, pending: pending, available: Math.max(0, earned - paidOut - pending) };
+}
+function photoFolder_() {
+  const p = props_(), id = p.getProperty('PHOTO_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const f = DriveApp.createFolder('IDTA Revision exam photos (private, auto-deleted)');
+  p.setProperty('PHOTO_FOLDER', f.getId());
+  return f;
+}
+/* Deletes exam photos older than PHOTO_DAYS. Runs by itself a few times a day when photos are uploaded; you can also run it from the editor. */
+function cleanPhotos() {
+  const cut = Date.now() - PHOTO_DAYS * 864e5, sh = sheet_('proctor');
+  sh.getDataRange().getValues().slice(1).forEach(r => { if (r[0] && new Date(r[1]).getTime() < cut) try { DriveApp.getFileById(String(r[7])).setTrashed(true); } catch (e) {} });
+  dropRows_(sh, r => !r[0] || new Date(r[1]).getTime() >= cut);
 }
 function proofFolder_() {
   const p = props_(), id = p.getProperty('PROOF_FOLDER');
@@ -918,13 +966,14 @@ function doGet(e) {
 
 /* Run once from the editor: creates the sheets, the pepper, and asks for Gmail permission (for reset codes). */
 function setup() {
-  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts', 'visits'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
+  ['users', 'sessions', 'events', 'news', 'questions', 'coupons', 'certs', 'payments', 'refunds', 'payouts', 'visits', 'proctor'].forEach(k => { const sh = sheet_(k); sh.getRange(1, 1, 1, SHEETS[k].cols.length).setValues([SHEETS[k].cols]).setFontWeight('bold'); });
   if (!props_().getProperty('UNI_DOMAINS')) props_().setProperty('UNI_DOMAINS', JSON.stringify(DEFAULT_DOMAINS));
   Logger.log('University packs installed: ' + (Object.keys(packs_()).join(', ') || 'none (add Pack.gs)'));
   pepper_();
   Logger.log('Data sheet ready: ' + book_().getUrl());
   Logger.log('Emails left today (for reset codes): ' + MailApp.getRemainingDailyQuota());
   Logger.log('Payment screenshots folder: ' + proofFolder_().getUrl());
+  Logger.log('Exam photos folder: ' + photoFolder_().getUrl());
   Logger.log(props_().getProperty('ADMIN_KEY') ? 'ADMIN_KEY is set.' : 'ADMIN_KEY is NOT set: run setAdminKey first.');
 }
 
