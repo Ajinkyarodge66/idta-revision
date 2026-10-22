@@ -11,22 +11,46 @@
  */
 const APP = 'IDTA Revision';
 const SHEETS = {
-  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access', 'Exam first used', 'Referred by', 'Source', 'Device'] },
+  users:    { name: 'Users',    cols: ['ID', 'Created', 'Name', 'Mobile', 'Email', 'University', 'Course', 'Password hash', 'Salt', 'On leaderboard', 'Progress', 'Progress updated', 'Last login', 'Reset code', 'Reset expires', 'Consent', 'University email', 'Verified university', 'Verify code', 'Verify expires', 'Exam access', 'Exam first used', 'Referred by', 'Source', 'Device', 'Site', 'Country'] },
   sessions: { name: 'Sessions', cols: ['Token hash', 'User ID', 'Created', 'Expires'] },
   events:   { name: 'Events',   cols: ['Time', 'User ID', 'Name', 'Event', 'Topic', 'Question', 'Correct', 'Score', 'Out of', 'Detail'] },
   news:     { name: 'Announcements', cols: ['ID', 'Created', 'Title', 'Message', 'Level', 'Expires', 'Audience'] },
   questions:{ name: 'Questions', cols: ['ID', 'Updated', 'Topic', 'Type', 'Prompt', 'Options', 'Answer', 'Explanation', 'Audience'] },
   coupons:  { name: 'Coupons',  cols: ['Code', 'Created', 'Max uses', 'Used', 'Expires', 'Note', 'Used by', 'Value per use'] },
-  certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam'] },
-  payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note'] },
-  refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note'] },
+  certs:    { name: 'Certificates', cols: ['ID', 'Issued', 'User ID', 'Name', 'Score', 'Out of', 'Exam', 'Site'] },
+  payments: { name: 'Payments', cols: ['ID', 'Submitted', 'User ID', 'Name', 'Mobile', 'Amount', 'Reference', 'Screenshot file ID', 'Status', 'Decided', 'Note', 'Currency'] },
+  refunds:  { name: 'Refunds',  cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send refund to', 'Reason', 'Status', 'Decided', 'Note', 'Currency'] },
   payouts:  { name: 'Referral payouts', cols: ['ID', 'Requested', 'User ID', 'Name', 'Mobile', 'Amount', 'Send to', 'Status', 'Decided', 'Note'] },
-  visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning'] },
+  visits:   { name: 'Visits', cols: ['Time', 'Source', 'Device', 'Logged in', 'Returning', 'Site'] },
   proctor:  { name: 'Exam photos', cols: ['ID', 'Time', 'User ID', 'Name', 'Exam session', 'Exam', 'Reason', 'Drive file ID'] }
 };
-const PHOTO_DAYS = 30;   // exam photos are deleted automatically after this many days
+const PHOTO_DAYS = 30;
+/* Two websites share this backend: 'uk' (IDTA Revision) and 'global' (JobReady AI). */
+const BRANDS = { uk: 'IDTA Revision', global: 'JobReady AI' };
+function site_(v) { return v === 'global' ? 'global' : 'uk'; }
+function brand_(site) { return BRANDS[site_(site)]; }
+function country_(v) { const c = String(v || '').toUpperCase(); return /^[A-Z]{2}$/.test(c) ? c : ''; }
+/* Fair local prices for unlocking the course exams. Edit them in Admin -> Exam & coupons -> Prices by country. */
+const DEFAULT_REGIONS = [
+  { id: 'GB', name: 'United Kingdom', countries: ['GB'], cur: 'GBP', amount: 3, label: '£3' },
+  { id: 'IN', name: 'India', countries: ['IN'], cur: 'INR', amount: 199, label: '₹199' },
+  { id: 'PK', name: 'Pakistan', countries: ['PK'], cur: 'PKR', amount: 499, label: 'Rs 499' },
+  { id: 'BD', name: 'Bangladesh', countries: ['BD'], cur: 'BDT', amount: 249, label: '৳249' },
+  { id: 'NG', name: 'Nigeria', countries: ['NG'], cur: 'NGN', amount: 1500, label: '₦1,500' },
+  { id: 'AE', name: 'UAE', countries: ['AE'], cur: 'AED', amount: 12, label: 'AED 12' },
+  { id: 'NA', name: 'USA & Canada', countries: ['US', 'CA'], cur: 'USD', amount: 3.99, label: '$3.99' },
+  { id: 'EU', name: 'Europe', countries: ['IE', 'DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'PT', 'AT', 'FI', 'GR', 'PL', 'SE', 'DK', 'CZ', 'RO', 'HU', 'SK', 'SI', 'HR', 'LT', 'LV', 'EE', 'LU', 'MT', 'CY', 'BG'], cur: 'EUR', amount: 3.49, label: '€3.49' },
+  { id: 'OTHER', name: 'Rest of the world', countries: [], cur: 'USD', amount: 2.99, label: '$2.99' }
+];
+/* Approximate value of 1 unit in GBP, only for adding up the sales dashboard. */
+const TO_GBP = { GBP: 1, INR: 0.0091, PKR: 0.0027, BDT: 0.0066, NGN: 0.0005, AED: 0.21, USD: 0.77, EUR: 0.86, CAD: 0.56, LKR: 0.0026, NPR: 0.0057, KES: 0.006, GHS: 0.05, MYR: 0.17, SAR: 0.2, AUD: 0.5 };
+function regions_() {
+  let r = null; try { r = JSON.parse(props_().getProperty('PRICES') || 'null'); } catch (e) {}
+  return Array.isArray(r) && r.length ? r : DEFAULT_REGIONS;
+}
+function regionOf_(country) { const rs = regions_(), c = country_(country); return rs.find(x => x.id !== 'OTHER' && (x.countries || []).indexOf(c) >= 0) || rs.find(x => x.id === 'OTHER') || rs[0]; }   // exam photos are deleted automatically after this many days
 const TOPIC_KEYS = ['data', 'dist', 'prep', 'cls', 'eval', 'nn', 'ens', 'reg', 'arm', 'clu', 'py', 'math', 'nlp', 'genai', 'ops'];
-const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22, src: 23, dev: 24 };
+const U = { id: 0, created: 1, name: 2, mobile: 3, email: 4, uni: 5, course: 6, hash: 7, salt: 8, lb: 9, prog: 10, progAt: 11, last: 12, rcode: 13, rexp: 14, consent: 15, uniEmail: 16, vuni: 17, vcode: 18, vexp: 19, exam: 20, examUsed: 21, refBy: 22, src: 23, dev: 24, site: 25, country: 26 };
 const REF_REWARD = 1, REF_DAYS = 10;   // £1 per friend who pays and studies on 10 different days
 const DEFAULT_DOMAINS = { 'myport.ac.uk': 'University of Portsmouth', 'port.ac.uk': 'University of Portsmouth' };
 const SESSION_DAYS = 30;
@@ -99,7 +123,7 @@ function setCell_(sh, i, col, val) { sh.getRange(i + 1, col + 1).setValue(val); 
 function profile_(r) {
   return { id: String(r[U.id]), pid: pid_(r[U.id]), name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]),
     university: String(r[U.uni]), course: String(r[U.course]), lb: r[U.lb] === 'yes', created: String(r[U.created]),
-    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: !!r[U.exam], examUsed: !!r[U.examUsed], refCode: refCode_(r[U.id]) };
+    uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: !!r[U.exam], examUsed: !!r[U.examUsed], refCode: refCode_(r[U.id]), site: site_(r[U.site]), country: String(r[U.country] || '') };
 }
 function progress_(r) { try { return r[U.prog] ? JSON.parse(r[U.prog]) : null; } catch (e) { return null; } }
 function newSession_(uid) {
@@ -163,8 +187,8 @@ const API = {
       const row = [id, now_(), name, mobile, email, uni, course, hashPw_(pw, salt), salt, b.lb === false ? 'no' : 'yes', '', '', now_(), '', '', now_()];
       const ref = String(b.ref || '').toUpperCase().replace(/[^0-9A-F]/g, '');
       if (ref.length === 8) { for (let i = 1; i < all.v.length; i++) if (refCode_(all.v[i][U.id]) === ref) { while (row.length < U.refBy) row.push(''); row[U.refBy] = String(all.v[i][U.id]); break; } }
-      while (row.length < U.dev + 1) row.push('');
-      row[U.src] = src_(b.src) || (row[U.refBy] ? 'referral' : 'direct'); row[U.dev] = dev_(b.dev);
+      while (row.length < U.country + 1) row.push('');
+      row[U.src] = src_(b.src) || (row[U.refBy] ? 'referral' : 'direct'); row[U.dev] = dev_(b.dev); row[U.site] = site_(b.site); row[U.country] = country_(b.country);
       all.sh.appendRow(row);
       cache_().remove('leaderboard');
       return { ok: true, token: newSession_(id), profile: profile_(row), progress: null };
@@ -234,6 +258,7 @@ const API = {
     setCell_(m.sh, m.i, U.lb, b.lb === false ? 'no' : 'yes');
     cache_().remove('leaderboard');
     const r = m.r.slice(); r[U.name] = name; r[U.uni] = uni; r[U.course] = course; r[U.lb] = b.lb === false ? 'no' : 'yes';
+    if (country_(b.country)) { setCell_(m.sh, m.i, U.country, country_(b.country)); r[U.country] = country_(b.country); }
     return { ok: true, profile: profile_(r) };
   }),
 
@@ -262,8 +287,8 @@ const API = {
         setCell_(all.sh, i, U.rexp, new Date(Date.now() + 15 * 60000).toISOString());
         MailApp.sendEmail({
           to: String(all.v[i][U.email]),
-          subject: APP + ': your password reset code',
-          body: 'Hi ' + all.v[i][U.name] + ',\n\nYour IDTA Revision password reset code is: ' + code +
+          subject: brand_(all.v[i][U.site]) + ': your password reset code',
+          body: 'Hi ' + all.v[i][U.name] + ',\n\nYour ' + brand_(all.v[i][U.site]) + ' password reset code is: ' + code +
                 '\n\nIt expires in 15 minutes. If you did not ask for this, ignore this email; your password has not changed.'
         });
       }
@@ -493,11 +518,21 @@ const API = {
     if (i < 0) return fail_('no_user');
     const val = b.on ? 'granted by admin · ' + now_() : '';
     setCell_(all.sh, i, U.exam, val);
-    if (b.on) sale_(String(all.v[i][U.id]), all.v[i][U.name], money_(b.amount), money_(b.amount) ? 'admin (paid)' : 'admin (free)');
+    if (b.on) { const reg = regionOf_(all.v[i][U.country]), amt = b.amount === 'region' ? Number(reg.amount) || 0 : money_(b.amount), cur = b.amount === 'region' ? reg.cur : 'GBP';
+      sale_(String(all.v[i][U.id]), all.v[i][U.name], amt, amt ? 'admin (paid)' : 'admin (free)', cur); }
     else if (all.v[i][U.exam]) sheet_('events').appendRow([now_(), String(all.v[i][U.id]), text_(all.v[i][U.name], 40), 'revoke', '', '', '', 0, '', 'admin']);
     return { ok: true, id: String(all.v[i][U.id]), examAccess: val };
   }),
   // lock: whether the course exam needs access; price: shown on the lock screen; how: how to pay (shown only to logged-in students).
+  adminSetPrices: b => admin_(b, () => {
+    if (!Array.isArray(b.regions) || !b.regions.length || b.regions.length > 40) return fail_('bad_prices');
+    const out = b.regions.map(r => ({ id: plain_(r.id, 12).toUpperCase().replace(/[^A-Z0-9_]/g, '') || 'R', name: plain_(r.name, 40), countries: (r.countries || []).map(country_).filter(Boolean).slice(0, 80),
+      cur: plain_(r.cur, 3).toUpperCase().replace(/[^A-Z]/g, '') || 'USD', amount: Math.max(0, Math.round(Number(r.amount) * 100) / 100 || 0), label: plain_(r.label, 16), how: String(r.how || '').split(/\r?\n/).map(l => plain_(l, 200)).join('\n').trim().slice(0, 600) }));
+    if (!out.some(r => r.id === 'OTHER')) return fail_('bad_prices');
+    props_().setProperty('PRICES', JSON.stringify(out));
+    cache_().remove('config');
+    return { ok: true, exam: examCfg_() };
+  }),
   adminSetExamConfig: b => admin_(b, () => {
     const cfg = { lock: !!b.lock, price: plain_(b.price, 20) || '£3', how: String(b.how || '').split(/\r?\n/).map(l => plain_(l, 200)).join('\n').trim().slice(0, 600) };
     props_().setProperty('EXAM_CFG', JSON.stringify(cfg));
@@ -508,7 +543,7 @@ const API = {
     const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => ['unlock', 'revoke', 'refund', 'payout', 'restore'].indexOf(r[3]) >= 0);
     const users = usersAll_().v.slice(1);
     return { ok: true, exam: examCfg_(), accounts: users.length, unlocked: users.filter(r => r[U.exam]).length,
-      sales: ev.map(r => ({ ts: new Date(r[0]).getTime(), id: String(r[1]), name: String(r[2]).replace(/^'/, ''), kind: String(r[3]), amount: Number(r[7]) || 0, how: String(r[9] || '') })) };
+      sales: ev.map(r => { const cur = String(r[8] || 'GBP'), amt = Number(r[7]) || 0; return { ts: new Date(r[0]).getTime(), id: String(r[1]), name: String(r[2]).replace(/^'/, ''), kind: String(r[3]), amount: Math.round(amt * (TO_GBP[cur] || 0) * 100) / 100, orig: amt, cur: cur, how: String(r[9] || '') }; }) };
   }),
 
   /* ----- certificates ----- */
@@ -522,7 +557,7 @@ const API = {
     for (let i = 1; i < v.length; i++) if (String(v[i][2]) === m.uid && String(v[i][6]) === exam && Number(v[i][4]) >= score) return { ok: true, cert: certOut_(v[i]) };
     bump_(key, 86400);
     let id; do { id = 'C' + sha_(Utilities.getUuid()).slice(0, 9).toUpperCase(); } while (rowOf_(v, 0, id) > 0);
-    const row = [id, now_(), m.uid, text_(m.r[U.name], 40), score, n, exam];
+    const row = [id, now_(), m.uid, text_(m.r[U.name], 40), score, n, exam, site_(b.site || m.r[U.site])];
     sh.appendRow(row);
     return { ok: true, cert: certOut_(row) };
   }),
@@ -550,12 +585,12 @@ const API = {
       bump_(key, 86400);
       const id = 'P' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
       const file = proofFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(data), mt, id + '-' + String(m.r[U.name]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 30) + (mt === 'image/png' ? '.png' : mt === 'image/webp' ? '.webp' : '.jpg')));
-      const amount = money_(String(examCfg_().price).replace(/[^0-9.]/g, '')) || 0;
-      sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), amount, text_(b.ref, 60), file.getId(), 'pending', '', '']);
+      const reg = regionOf_(m.r[U.country]), amount = Number(reg.amount) || 0;
+      sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), amount, text_(b.ref, 60), file.getId(), 'pending', '', '', reg.cur]);
       try {
         const to = props_().getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail();
-        if (to) MailApp.sendEmail({ to: to, subject: APP + ': payment to check from ' + m.r[U.name],
-          body: m.r[U.name] + ' (+' + m.r[U.mobile] + ') uploaded a payment screenshot' + (b.ref ? ' (reference: ' + plain_(b.ref, 60) + ')' : '') + '.\n\nOpen your app, go to Admin -> Exam & coupons, and approve or reject it.' });
+        if (to) MailApp.sendEmail({ to: to, subject: brand_(m.r[U.site]) + ': payment to check from ' + m.r[U.name],
+          body: m.r[U.name] + ' (+' + m.r[U.mobile] + ', ' + (m.r[U.country] || 'country not set') + ') uploaded a payment screenshot for ' + reg.label + (b.ref ? ' (reference: ' + plain_(b.ref, 60) + ')' : '') + '.\n\nOpen your app, go to Admin -> Exam & coupons, and approve or reject it.' });
       } catch (e) {}
       return { ok: true, payment: { id: id, status: 'pending', submitted: now_() } };
     });
@@ -570,7 +605,7 @@ const API = {
   adminPayments: b => admin_(b, () => {
     const v = sheet_('payments').getDataRange().getValues().slice(1).filter(r => r[0]);
     const list = v.map(r => ({ id: String(r[0]), submitted: String(r[1]), uid: String(r[2]), name: String(r[3]).replace(/^'/, ''), mobile: String(r[4]).replace(/^'/, ''), amount: Number(r[5]) || 0,
-      ref: String(r[6] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, '') })).reverse();
+      ref: String(r[6] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, ''), cur: String(r[11] || 'GBP') })).reverse();
     return { ok: true, pending: list.filter(p => p.status === 'pending'), recent: list.filter(p => p.status !== 'pending').slice(0, 30) };
   }),
   adminPaymentImage: b => admin_(b, () => {
@@ -583,14 +618,14 @@ const API = {
     const sh = sheet_('payments'), v = sh.getDataRange().getValues(), i = rowOf_(v, 0, String(b.id || ''));
     if (i < 0) return fail_('no_payment');
     if (v[i][8] !== 'pending') return fail_('already_decided');
-    const ok = !!b.approve, note = text_(b.note, 120), amount = b.amount != null ? money_(b.amount) : Number(v[i][5]) || 0;
+    const ok = !!b.approve, note = text_(b.note, 120), amount = b.amount != null ? money_(b.amount) : Number(v[i][5]) || 0, cur = String(v[i][11] || 'GBP');
     sh.getRange(i + 1, 9, 1, 3).setValues([[ok ? 'approved' : 'rejected', now_(), note]]);
     const all = usersAll_(), u = rowOf_(all.v, U.id, String(v[i][2]));
     if (u > 0) {
       const r = all.v[u];
-      if (ok && !r[U.exam]) { setCell_(all.sh, u, U.exam, 'payment ' + v[i][0] + ' · ' + now_()); sale_(String(r[U.id]), r[U.name], amount, 'payment ' + v[i][0] + (v[i][6] ? ' · ' + String(v[i][6]).replace(/^'/, '') : '')); }
+      if (ok && !r[U.exam]) { setCell_(all.sh, u, U.exam, 'payment ' + v[i][0] + ' · ' + now_()); sale_(String(r[U.id]), r[U.name], amount, 'payment ' + v[i][0] + (v[i][6] ? ' · ' + String(v[i][6]).replace(/^'/, '') : ''), cur); }
       try {
-        MailApp.sendEmail({ to: String(r[U.email]), subject: APP + (ok ? ': your course exams are unlocked' : ': we could not confirm your payment'),
+        MailApp.sendEmail({ to: String(r[U.email]), subject: brand_(r[U.site]) + (ok ? ': your course exams are unlocked' : ': we could not confirm your payment'),
           body: 'Hi ' + r[U.name] + ',\n\n' + (ok ? 'Your payment is confirmed and the course exams are unlocked. Open the app and go to the Mock exam tab. Good luck!' : 'We could not confirm your payment' + (note ? ': ' + plain_(note, 120) : '') + '.\n\nOpen the Mock exam tab to upload a clearer screenshot, or contact the organiser.') });
       } catch (e) {}
     }
@@ -607,9 +642,9 @@ const API = {
     const m = me_(b); if (!m) return fail_('auth');
     const mon = money_by_user_()[m.uid] || {};
     const rf = sheet_('refunds').getDataRange().getValues().slice(1).filter(r => String(r[2]) === m.uid).pop();
-    return { ok: true, access: !!m.r[U.exam], how: String(m.r[U.exam] || ''), paid: mon.paid || 0, examUsed: !!m.r[U.examUsed],
+    return { ok: true, access: !!m.r[U.exam], how: String(m.r[U.exam] || ''), paid: mon.paid || 0, cur: mon.cur || 'GBP', examUsed: !!m.r[U.examUsed],
       refundable: !!m.r[U.exam] && !m.r[U.examUsed] && (mon.paid || 0) > 0 && !mon.refunded,
-      refund: rf ? { id: String(rf[0]), requested: String(rf[1]), amount: Number(rf[5]) || 0, status: String(rf[8]), note: String(rf[10] || '').replace(/^'/, '') } : null };
+      refund: rf ? { id: String(rf[0]), requested: String(rf[1]), amount: Number(rf[5]) || 0, cur: String(rf[11] || 'GBP'), status: String(rf[8]), note: String(rf[10] || '').replace(/^'/, '') } : null };
   },
   refundRequest: b => withLock_(() => {
     const m = me_(b); if (!m) return fail_('auth');
@@ -621,16 +656,16 @@ const API = {
     const sh = sheet_('refunds');
     if (sh.getDataRange().getValues().slice(1).some(r => String(r[2]) === m.uid && r[8] === 'pending')) return fail_('refund_pending');
     const id = 'R' + sha_(Utilities.getUuid()).slice(0, 8).toUpperCase();
-    sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), mon.paid, text_(to, 100), text_(b.reason, 200), 'pending', '', '']);
+    sh.appendRow([id, now_(), m.uid, text_(m.r[U.name], 40), "'+" + String(m.r[U.mobile]), mon.paid, text_(to, 100), text_(b.reason, 200), 'pending', '', '', mon.cur || 'GBP']);
     setCell_(m.sh, m.i, U.exam, '');
     sheet_('events').appendRow([now_(), m.uid, text_(m.r[U.name], 40), 'revoke', '', '', '', 0, '', 'refund requested ' + id]);
-    notifyAdmin_('refund request from ' + m.r[U.name], m.r[U.name] + ' (+' + m.r[U.mobile] + ') cancelled and asked for a refund of £' + mon.paid + '.\nSend it to: ' + to + (b.reason ? '\nReason: ' + plain_(b.reason, 200) : '') + '\n\nTheir exam access is already removed. After you send the money, open Admin -> Exam & coupons and click "Mark refunded".');
+    notifyAdmin_('refund request from ' + m.r[U.name], m.r[U.name] + ' (+' + m.r[U.mobile] + ') cancelled and asked for a refund of ' + mon.paid + ' ' + (mon.cur || 'GBP') + '.\nSend it to: ' + to + (b.reason ? '\nReason: ' + plain_(b.reason, 200) : '') + '\n\nTheir exam access is already removed. After you send the money, open Admin -> Exam & coupons and click "Mark refunded".');
     const row = m.r.slice(); row[U.exam] = '';
     return { ok: true, profile: profile_(row) };
   }),
   adminRefunds: b => admin_(b, () => {
     const list = sheet_('refunds').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ id: String(r[0]), requested: String(r[1]), name: String(r[3]).replace(/^'/, ''), mobile: String(r[4]).replace(/^'/, ''),
-      amount: Number(r[5]) || 0, to: String(r[6]).replace(/^'/, ''), reason: String(r[7] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, '') })).reverse();
+      amount: Number(r[5]) || 0, cur: String(r[11] || 'GBP'), to: String(r[6]).replace(/^'/, ''), reason: String(r[7] || '').replace(/^'/, ''), status: String(r[8]), decided: String(r[9] || ''), note: String(r[10] || '').replace(/^'/, '') })).reverse();
     return { ok: true, pending: list.filter(x => x.status === 'pending'), recent: list.filter(x => x.status !== 'pending').slice(0, 30) };
   }),
   // refunded = true: you sent the money back. false: decline and give their access back.
@@ -641,10 +676,10 @@ const API = {
     const ok = !!b.refunded, note = text_(b.note, 120), uid = String(v[i][2]);
     sh.getRange(i + 1, 9, 1, 3).setValues([[ok ? 'refunded' : 'declined', now_(), note]]);
     const all = usersAll_(), u = rowOf_(all.v, U.id, uid);
-    if (ok) sheet_('events').appendRow([now_(), uid, text_(v[i][3], 40), 'refund', '', '', '', Number(v[i][5]) || 0, '', 'refund ' + v[i][0]]);
+    if (ok) sheet_('events').appendRow([now_(), uid, text_(v[i][3], 40), 'refund', '', '', '', Number(v[i][5]) || 0, String(v[i][11] || 'GBP'), 'refund ' + v[i][0]]);
     else if (u > 0) { setCell_(all.sh, u, U.exam, 'restored after declined refund · ' + now_()); sheet_('events').appendRow([now_(), uid, text_(v[i][3], 40), 'restore', '', '', '', 0, '', 'refund declined ' + v[i][0]]); }
-    if (u > 0) try { MailApp.sendEmail({ to: String(all.v[u][U.email]), subject: APP + (ok ? ': your refund has been sent' : ': about your refund request'),
-      body: 'Hi ' + all.v[u][U.name] + ',\n\n' + (ok ? 'Your refund of £' + v[i][5] + ' has been sent to ' + String(v[i][6]).replace(/^'/, '') + '.' : 'Your refund request was declined' + (note ? ': ' + plain_(note, 120) : '') + '. Your exam access has been restored.') }); } catch (e) {}
+    if (u > 0) try { MailApp.sendEmail({ to: String(all.v[u][U.email]), subject: brand_(all.v[u][U.site]) + (ok ? ': your refund has been sent' : ': about your refund request'),
+      body: 'Hi ' + all.v[u][U.name] + ',\n\n' + (ok ? 'Your refund of ' + v[i][5] + ' ' + String(v[i][11] || 'GBP') + ' has been sent to ' + String(v[i][6]).replace(/^'/, '') + '.' : 'Your refund request was declined' + (note ? ': ' + plain_(note, 120) : '') + '. Your exam access has been restored.') }); } catch (e) {}
     return { ok: true };
   }),
 
@@ -679,7 +714,7 @@ const API = {
     if (v[i][7] !== 'pending') return fail_('already_decided');
     const ok = !!b.paid, note = text_(b.note, 120);
     sh.getRange(i + 1, 8, 1, 3).setValues([[ok ? 'paid' : 'declined', now_(), note]]);
-    if (ok) sheet_('events').appendRow([now_(), String(v[i][2]), text_(v[i][3], 40), 'payout', '', '', '', Number(v[i][5]) || 0, '', 'referral payout ' + v[i][0]]);
+    if (ok) sheet_('events').appendRow([now_(), String(v[i][2]), text_(v[i][3], 40), 'payout', '', '', '', Number(v[i][5]) || 0, 'GBP', 'referral payout ' + v[i][0]]);
     return { ok: true };
   }),
 
@@ -688,7 +723,7 @@ const API = {
     if (tooMany_('hits', 20000)) return { ok: true };   // flood guard
     bump_('hits', 86400);
     const sh = sheet_('visits');
-    sh.appendRow([now_(), src_(b.src) || 'direct', dev_(b.dev), b.li ? 'yes' : 'no', b.ret ? 'yes' : 'no']);
+    sh.appendRow([now_(), src_(b.src) || 'direct', dev_(b.dev), b.li ? 'yes' : 'no', b.ret ? 'yes' : 'no', site_(b.site)]);
     return { ok: true };
   },
   adminAnalytics: b => admin_(b, () => {
@@ -696,16 +731,19 @@ const API = {
     const now = Date.now(), from = now - days * 864e5, dayK = t => new Date(t).toISOString().slice(0, 10);
     const keys = []; for (let i = Math.min(days, 90) - 1; i >= 0; i--) keys.push(dayK(now - i * 864e5));
     const series = () => { const o = {}; keys.forEach(k => o[k] = 0); return o; };
-    const visits = sheet_('visits').getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({ t: new Date(r[0]).getTime(), src: String(r[1] || 'direct'), dev: String(r[2] || ''), li: r[3] === 'yes' }));
-    const users = usersAll_().v.slice(1).filter(r => r[U.id]).map(r => ({ id: String(r[U.id]), t: new Date(r[U.created]).getTime(), src: String(r[U.src] || 'unknown'), dev: String(r[U.dev] || 'unknown'), ref: !!r[U.refBy] }));
+    const want = b.site === 'uk' || b.site === 'global' ? b.site : '';
+    const visits = sheet_('visits').getDataRange().getValues().slice(1).filter(r => r[0] && (!want || site_(r[5]) === want)).map(r => ({ t: new Date(r[0]).getTime(), src: String(r[1] || 'direct'), dev: String(r[2] || ''), li: r[3] === 'yes' }));
+    const users = usersAll_().v.slice(1).filter(r => r[U.id] && (!want || site_(r[U.site]) === want)).map(r => ({ id: String(r[U.id]), t: new Date(r[U.created]).getTime(), src: String(r[U.src] || 'unknown'), dev: String(r[U.dev] || 'unknown'), ref: !!r[U.refBy], country: String(r[U.country] || '') }));
+    const inSite = {}; users.forEach(u => inSite[u.id] = 1);
     const ev = sheet_('events').getDataRange().getValues().slice(1).filter(r => r[1]);
     const certs = sheet_('certs').getDataRange().getValues().slice(1).filter(r => r[0]);
     const act = {}, unlockAt = {}, revenue = {}, mockers = {};
     ev.forEach(r => {
       const t = new Date(r[0]).getTime(), uid = String(r[1]), e = r[3];
+      if (!inSite[uid]) return;
       if (e === 'q' || e === 'mock' || e === 'lab') (act[uid] = act[uid] || []).push(t);
       if (e === 'mock') mockers[uid] = Math.min(mockers[uid] || Infinity, t);
-      if (e === 'unlock') { if (!unlockAt[uid]) unlockAt[uid] = t; revenue[uid] = (revenue[uid] || 0) + (Number(r[7]) || 0); }
+      if (e === 'unlock') { if (!unlockAt[uid]) unlockAt[uid] = t; revenue[uid] = (revenue[uid] || 0) + (Number(r[7]) || 0) * (TO_GBP[String(r[8] || 'GBP')] || 0); }
       if (e === 'refund' || e === 'payout') revenue[uid] = (revenue[uid] || 0);
     });
     // funnel for the period (sign-ups in the period and what they went on to do)
@@ -738,7 +776,8 @@ const API = {
     const ret = n => { const pool = users.filter(u => u.t <= now - n * 864e5); const back = pool.filter(u => (act[u.id] || []).some(t => t >= u.t + n * 864e5)); return { pool: pool.length, back: back.length }; };
     return { ok: true, days: days, keys: keys, funnel: funnel, daily: { visits: keys.map(k => dv[k]), signups: keys.map(k => ds[k]), active: keys.map(k => da[k]), unlocks: keys.map(k => du[k]) },
       sources: Object.keys(src).map(k => Object.assign({ src: k }, src[k])).sort((a, b) => b.signups - a.signups || b.visits - a.visits), engagement: engagement, devices: devices,
-      retention: { d1: ret(1), d7: ret(7), d30: ret(30) }, totals: { users: users.length, visits: visits.length } };
+      retention: { d1: ret(1), d7: ret(7), d30: ret(30) }, totals: { users: users.length, visits: visits.length },
+      countries: Object.entries(uIn.reduce((o, u) => (o[u.country || '??'] = (o[u.country || '??'] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1]).slice(0, 15) };
   }),
   adminStudent: b => admin_(b, () => {
     const all = usersAll_(), i = rowOf_(all.v, U.id, String(b.id || ''));
@@ -750,7 +789,7 @@ const API = {
     const pick = (sheetKey, f) => sheet_(sheetKey).getDataRange().getValues().slice(1).filter(x => String(x[2]) === uid).map(f);
     return { ok: true,
       profile: { id: uid, name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]), university: String(r[U.uni]), course: String(r[U.course]), created: String(r[U.created]), lastLogin: String(r[U.last]),
-        verifiedUni: String(r[U.vuni] || ''), exam: String(r[U.exam] || ''), examUsed: String(r[U.examUsed] || ''), src: String(r[U.src] || ''), dev: String(r[U.dev] || ''), referredBy: ref ? String(ref[U.name]) : '' },
+        verifiedUni: String(r[U.vuni] || ''), exam: String(r[U.exam] || ''), examUsed: String(r[U.examUsed] || ''), src: String(r[U.src] || ''), dev: String(r[U.dev] || ''), referredBy: ref ? String(ref[U.name]) : '', site: site_(r[U.site]), country: String(r[U.country] || '') },
       lessons: (prog['idta-lessons'] || []).length, mustTicked: (prog['idta-must'] || []).length, mistakes: (prog['idta-miss'] || []).length, goal: prog['idta-goal'] || null, examDate: prog['idta-examdate'] || null,
       events: ev.slice(-2000),
       certs: pick('certs', x => ({ id: String(x[0]), issued: String(x[1]), score: Number(x[4]), n: Number(x[5]), exam: String(x[6]) })),
@@ -814,7 +853,7 @@ const API = {
       users: users.map(r => Object.assign({
         id: String(r[U.id]), name: String(r[U.name]), mobile: String(r[U.mobile]), email: String(r[U.email]),
         university: String(r[U.uni]), course: String(r[U.course]), lb: r[U.lb] === 'yes', created: String(r[U.created]), lastLogin: String(r[U.last]),
-        uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: String(r[U.exam] || '')
+        uniEmail: String(r[U.uniEmail] || ''), verifiedUni: String(r[U.vuni] || ''), examAccess: String(r[U.exam] || ''), site: site_(r[U.site]), country: String(r[U.country] || '')
       }, s.users[String(r[U.id])] || blank_()))
     };
   }
@@ -823,11 +862,11 @@ function examCfg_() {
   let c = null;
   try { c = JSON.parse(props_().getProperty('EXAM_CFG') || 'null'); } catch (e) {}
   c = c || {};
-  return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '', refReward: REF_REWARD, refDays: REF_DAYS };
+  return { lock: c.lock !== false, price: c.price || '£3', how: c.how || '', refReward: REF_REWARD, refDays: REF_DAYS, regions: regions_().map(r => ({ id: r.id, name: r.name, countries: r.countries || [], cur: r.cur, amount: r.amount, label: r.label, how: r.how || '' })) };
 }
 function money_(v) { const n = Math.round(Number(v) * 100) / 100; return isFinite(n) && n > 0 ? Math.min(n, 1000) : 0; }
-function sale_(uid, name, amount, how) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, '', text_(how, 60)]); }
-function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, '') }; }
+function sale_(uid, name, amount, how, cur) { sheet_('events').appendRow([now_(), uid, text_(name, 40), 'unlock', '', '', '', amount, cur || 'GBP', text_(how, 60)]); }
+function certOut_(r) { return { id: String(r[0]), issued: String(r[1]), name: String(r[3]).replace(/^'/, ''), score: Number(r[4]), n: Number(r[5]), exam: String(r[6]).replace(/^'/, ''), site: site_(r[7]) }; }
 function src_(v) { return String(v || '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40); }
 function dev_(v) { return ['phone', 'tablet', 'desktop'].indexOf(String(v)) >= 0 ? String(v) : 'unknown'; }
 function refCode_(uid) { return pid_(uid).slice(0, 8).toUpperCase(); }
@@ -840,7 +879,7 @@ function money_by_user_() {
   sheet_('events').getDataRange().getValues().slice(1).forEach(r => {
     const uid = String(r[1]), ev = r[3]; if (!uid) return;
     const o = out[uid] = out[uid] || { paid: 0, refunded: false, days: {} };
-    if (ev === 'unlock') { o.paid = Number(r[7]) || 0; o.refunded = false; }
+    if (ev === 'unlock') { o.paid = Number(r[7]) || 0; o.cur = String(r[8] || 'GBP'); o.refunded = false; }
     else if (ev === 'refund') o.refunded = true;
     else if (ev === 'q' || ev === 'mock' || ev === 'lab') { const t = new Date(r[0]); if (!isNaN(t)) o.days[t.toISOString().slice(0, 10)] = 1; }
   });

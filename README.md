@@ -7,6 +7,8 @@ A free study app with two parts:
 
 **▶ Open the app: https://ajinkyarodge66.github.io/idta-revision/**
 
+Outside the UK? **[JobReady AI](https://ajinkyarodge66.github.io/jobready-ai/)** is the international edition, with local prices and a Career hub (roadmap, portfolio projects, interview prep). Both editions share the same accounts.
+
 ![IDTA Revision](assets/og.png)
 
 It works on phones and laptops, and offline once it has loaded. On your phone, use **Add to Home Screen** to install it like an app.
@@ -33,7 +35,7 @@ Topics: data & statistics, similarity & distance, data preparation, classificati
 
 ## Accounts & privacy
 
-Students sign up with their **name, mobile number, email, university, course and a password**, then log in with **mobile number + password**. Progress (answers, mistakes, mock history, must-know ticks) is backed up to the account and restored on any device. Forgot your password? A 6-digit reset code is emailed to you.
+Students sign up with their **name, country, mobile number (with country code), email, university, course and a password**, then log in with **mobile number + password**. Progress (answers, mistakes, mock history, must-know ticks) is backed up to the account and restored on any device. Forgot your password? A 6-digit reset code is emailed to you.
 
 Details are stored in a private Google Sheet run by the group organiser and used only to run the app: logins, progress backup, reset codes, the leaderboard (name, course and scores, only if you opt in) and showing which topics the class finds hard. Passwords are never stored or sent in readable form. You can hide yourself from the leaderboard or **delete your account and all its data** in the Account tab.
 

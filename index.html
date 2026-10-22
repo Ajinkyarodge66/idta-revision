@@ -417,6 +417,26 @@ ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
 .ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));gap:.6rem;margin-top:.5rem}
 .ph-grid figure{margin:0}.ph-grid img{display:block;width:100%;border-radius:8px;border:1px solid var(--line)}.ph-grid figcaption{font-size:.75rem;color:var(--muted);margin-top:.2rem}
 .ph-miss{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:var(--code-bg);border-radius:8px;color:var(--muted);font-size:.8rem}
+/* ---- editions, countries, career hub ---- */
+.cnote{font-size:.9rem;background:var(--accent-soft);border-radius:8px;padding:.5rem .7rem;margin:-.3rem 0 .8rem}
+.ed-news{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}.ed-news span{flex:1 1 18rem}
+.price-where{display:inline-block;margin-top:.2rem;font-weight:600}
+.badge.site-g{background:var(--accent-soft);color:var(--accent);font-size:.65rem}
+.pr-in{font:inherit;font-size:.88rem;width:100%;min-width:6rem;padding:.3rem .45rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}.pr-in.sm{min-width:4.5rem}
+#pr-table td{vertical-align:top}
+.career-head .tiles{margin-top:.8rem}
+.road{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.8rem}
+.road-w{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.1rem}.road-w.done{border-color:var(--good);background:linear-gradient(90deg,var(--good-soft),var(--surface) 40%)}
+.road-h{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}.road-h h3{margin:0;flex:1}.road-n{font-weight:700;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);min-width:4.5rem}
+.road-w ul{margin:.5rem 0}.road-out{margin:.3rem 0;color:var(--muted)}.road-ls{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
+.chip-btn{font:inherit;font-size:.82rem;border:1px solid var(--line);background:var(--accent-soft);color:var(--ink);border-radius:99px;padding:.2rem .65rem;cursor:pointer}
+.proj{margin-bottom:1rem}.proj.done{border-color:var(--good)}.proj-h{display:flex;justify-content:space-between;align-items:flex-start;gap:.8rem}.proj-h h3{margin:.3rem 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:.35rem;margin:.6rem 0}.chips span{font-size:.78rem;background:var(--code-bg);border-radius:99px;padding:.15rem .6rem}
+.proj pre{background:var(--code-bg);border-radius:8px;padding:.8rem;overflow:auto;font-size:.82rem}.tipline{background:var(--good-soft);border-radius:8px;padding:.5rem .7rem}
+.iv{display:flex;flex-direction:column;gap:.5rem}.iv-q{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem}.iv-q.done{border-color:var(--good)}
+.iv-q summary{cursor:pointer;font-weight:600}.iv-q p{margin:.6rem 0}
+.tricks{display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:.9rem}.trick{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.9rem 1rem}.trick-t{font-weight:600;margin:.3rem 0 .5rem}.trick ul{margin:0;padding-left:1.1rem}.trick li{margin:.2rem 0;font-size:.92rem}
+@media print{body.printcareer *{visibility:hidden!important}body.printcareer .tricks,body.printcareer .tricks *{visibility:visible!important}body.printcareer .tricks{position:absolute;left:0;top:0;width:100%}}
 .btn.small{font-size:.8rem;padding:.25rem .55rem;min-height:0}
 .syl-list{display:grid;gap:.1rem}
 .syl-row{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem 0;border-top:1px solid var(--line)}
@@ -549,6 +569,7 @@ ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
       <button role="tab" id="tab-stats" data-view="stats" aria-selected="false">Progress</button>
       <button role="tab" id="tab-class" data-view="class" aria-selected="false" hidden>Leaderboard</button>
       <button role="tab" id="tab-account" data-view="account" aria-selected="false" hidden>Account</button>
+      
       <button role="tab" id="tab-refer" data-view="refer" aria-selected="false" hidden>Refer &amp; earn</button>
       <button role="tab" id="tab-admin" data-view="admin" aria-selected="false" hidden>Admin</button>
     </nav>
@@ -561,7 +582,7 @@ ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
 </header>
 
 <main class="wrap">
-<div id="news" aria-live="polite"></div>
+<div id="news" aria-live="polite"></div><div id="ed-hint"></div>
 <section id="auth" hidden>
   <div class="hero">
     <div class="hero-copy">
@@ -700,6 +721,7 @@ ul.plain{margin:0;padding-left:1.1rem}ul.plain li{margin:.25rem 0}
 </section>
 
 <!-- ===================== ADMIN ===================== -->
+
 <section id="view-refer" data-view-panel="refer" hidden><div id="refer-root"></div></section>
 <section id="view-cert" data-view-panel="cert" hidden><div id="cert-root"></div></section>
 <section id="view-admin" data-view-panel="admin" hidden>
@@ -863,6 +885,20 @@ const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const shuffle = a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const store = {get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+/* Two editions are built from this one file: "uk" = IDTA Revision, "global" = JobReady AI (build.js switches it). */
+const EDITION = "uk";
+const BRANDS = { uk:"IDTA Revision", global:"JobReady AI" };
+const BRAND = BRANDS[EDITION];
+const SITE_URL = { uk:"https://ajinkyarodge66.github.io/idta-revision/", global:"https://ajinkyarodge66.github.io/jobready-ai/" };
+const COUNTRIES = [["GB","United Kingdom","44"],["IN","India","91"],["PK","Pakistan","92"],["BD","Bangladesh","880"],["LK","Sri Lanka","94"],["NP","Nepal","977"],["NG","Nigeria","234"],["GH","Ghana","233"],["KE","Kenya","254"],["ZA","South Africa","27"],["EG","Egypt","20"],["AE","United Arab Emirates","971"],["SA","Saudi Arabia","966"],["QA","Qatar","974"],["KW","Kuwait","965"],["OM","Oman","968"],["US","United States","1"],["CA","Canada","1"],["AU","Australia","61"],["NZ","New Zealand","64"],["IE","Ireland","353"],["DE","Germany","49"],["FR","France","33"],["ES","Spain","34"],["IT","Italy","39"],["NL","Netherlands","31"],["BE","Belgium","32"],["PT","Portugal","351"],["PL","Poland","48"],["SE","Sweden","46"],["DK","Denmark","45"],["FI","Finland","358"],["AT","Austria","43"],["GR","Greece","30"],["RO","Romania","40"],["CH","Switzerland","41"],["NO","Norway","47"],["TR","Turkey","90"],["CN","China","86"],["HK","Hong Kong","852"],["SG","Singapore","65"],["MY","Malaysia","60"],["ID","Indonesia","62"],["PH","Philippines","63"],["TH","Thailand","66"],["VN","Vietnam","84"],["JP","Japan","81"],["KR","South Korea","82"],["BR","Brazil","55"],["MX","Mexico","52"],["AR","Argentina","54"],["CO","Colombia","57"],["ZW","Zimbabwe","263"],["UG","Uganda","256"],["TZ","Tanzania","255"],["ET","Ethiopia","251"],["MA","Morocco","212"],["IR","Iran","98"],["IQ","Iraq","964"],["JO","Jordan","962"],["LB","Lebanon","961"],["AF","Afghanistan","93"],["MM","Myanmar","95"],["KZ","Kazakhstan","7"],["RU","Russia","7"],["UA","Ukraine","380"]];
+const flagOf = c => String.fromCodePoint(...[...String(c || "")].map(x => 127397 + x.charCodeAt(0)));
+const countryName = c => (COUNTRIES.find(x => x[0] === c) || [c, c || "Unknown"])[1];
+function guessCountry() {
+  if (EDITION === "uk") return "GB";
+  try { const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "", m = { "Asia/Kolkata":"IN", "Asia/Calcutta":"IN", "Asia/Karachi":"PK", "Asia/Dhaka":"BD", "Asia/Colombo":"LK", "Asia/Kathmandu":"NP", "Africa/Lagos":"NG", "Africa/Accra":"GH", "Africa/Nairobi":"KE", "Asia/Dubai":"AE", "Asia/Riyadh":"SA", "Europe/London":"GB", "Asia/Singapore":"SG", "Asia/Kuala_Lumpur":"MY" }; if (m[tz]) return m[tz]; if (/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix)/.test(tz)) return "US"; } catch (e) {}
+  const l = (navigator.languages || [navigator.language || ""]).map(x => (x.split("-")[1] || "").toUpperCase()).find(x => COUNTRIES.some(c => c[0] === x));
+  return l || "";
+}
 // Where did this visit come from? ?src= / utm_source= tags, a referral link, or the referring site.
 function trafficSource(){
   const q=new URLSearchParams(location.search);let s=q.get("src")||q.get("utm_source")||"";
@@ -936,7 +972,7 @@ function renderQ(el,it,mode,num,onChange){
 }
 
 /* ================= tabs ================= */
-const VIEWS=["learn","uni","must","practice","lab","mock","cards","stats","class","account","admin","cert","refer"];
+const VIEWS=["learn","uni","must","practice","lab","mock","cards","stats","class","account","admin","cert","refer","career"];
 function show(v){
   if(!VIEWS.includes(v)) v="learn";
   document.querySelectorAll("[data-view-panel]").forEach(p=>p.hidden=p.dataset.viewPanel!==v);
@@ -954,6 +990,7 @@ function show(v){
   if(v==="uni"&&typeof uniRender==="function")uniRender();
   if(v==="cert"&&typeof certRender==="function")certRender();
   if(v==="refer"&&typeof referRender==="function")referRender();
+  if(v==="career"&&typeof careerRender==="function")careerRender();
   window.scrollTo(0,0);
 }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
@@ -1168,9 +1205,13 @@ function startMock(n,mins,items,meta){if(MK.mode!=="pack"&&examLocked()){MK.stat
   MK.session=CAM.stream?Array.from(crypto.getRandomValues(new Uint8Array(6)),x=>x.toString(16).padStart(2,"0")).join(""):"";
   mockRender();
   if(CAM.stream){camShot("start");clearInterval(CAM.timer);CAM.timer=setInterval(()=>{if(MK.state==="run")camShot("timer")},PHOTO_MIN*60000)}}
+function regionFor(country){const rs=(examCfg()||{}).regions||[];return rs.find(r=>r.id!=="OTHER"&&(r.countries||[]).includes(country))||rs.find(r=>r.id==="OTHER")||null}
+function myRegion(){let c="";try{c=(AUTH.get()&&AUTH.get().profile.country)||""}catch(e){}return regionFor(c||(EDITION==="uk"?"GB":""))}
+const fmtCur=(n,cur)=>{try{return new Intl.NumberFormat(undefined,{style:"currency",currency:cur||"GBP",maximumFractionDigits:Number.isInteger(+n)?0:2}).format(+n)}catch(e){return (cur||"")+" "+n}};
 function examLockHTML(c){
-  const how=String(c.how||"").trim();
-  return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exams · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the random exam, Papers 1–3, topic tests and quick mocks, with unlimited attempts and certificates. Lessons, Practice, Calc Lab and flashcards stay free.</p></div></div>
+  const reg=myRegion();if(reg)c={...c,price:reg.label||c.price};
+  const how=String((reg&&reg.how)||c.how||"").trim();
+  return `<div class="card unlock" id="ex-lock"><div class="unlock-head"><span class="unlock-ic" aria-hidden="true">🔒</span><div><h2>Unlock the course exams · ${esc(c.price||"£3")}</h2><p class="hint" style="margin:0">One payment unlocks the random exam, Papers 1–3, topic tests and quick mocks, with unlimited attempts and certificates. Lessons, Practice, Calc Lab and flashcards stay free.${reg&&reg.name?` <span class="price-where">Price for ${esc(reg.name)}.</span>`:""}</p></div></div>
   <p class="refund-line">↩️ Refund policy: cancel any time <b>before you start your first course exam</b> for a full refund. Once you start an exam, the payment is non-refundable.</p>
   <form id="f-unlock" class="unlock-form" novalidate><label for="ex-code">Have a code?</label><div class="unlock-row"><input id="ex-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="e.g. IDTA-7F3K2A"><button class="btn primary" type="submit">Unlock</button></div><div id="ex-msg" role="status"></div></form>
   <div class="unlock-how"><b>How to pay</b>${how?`<p style="white-space:pre-line;margin:.3rem 0 0">${esc(how)}</p>`:`<p style="margin:.3rem 0 0">Ask the organiser of your study group how to pay.</p>`}</div>
@@ -1301,7 +1342,7 @@ function mockRender(){
   const rev=(onlyWrong)=>{const box=$("#mk-review");box.innerHTML="";MK.items.forEach((x,j)=>{if(onlyWrong&&correct(x))return;const c=document.createElement("div");c.className="card";c.id="rev-"+j;box.appendChild(c);renderQ(c,x,"review",j+1)})};
   rev(false);
   animateRings(root);
-  if($("#mk-cert"))$("#mk-cert").onclick=e=>busy(e.target,"Issuing…",async()=>{const r=await api("certIssue",{token:AUTH.token(),score,n:N,exam:label});if(!r.ok)return toast(errMsg(r.error));CERT.data=r.cert;show("cert");toast("Certificate issued.")});
+  if($("#mk-cert"))$("#mk-cert").onclick=e=>busy(e.target,"Issuing…",async()=>{const r=await api("certIssue",{token:AUTH.token(),score,n:N,exam:label,site:EDITION});if(!r.ok)return toast(errMsg(r.error));CERT.data=r.cert;show("cert");toast("Certificate issued.")});
   $("#mk-new").onclick=()=>{MK.state="intro";MK.items=[];mockRender()};
   $("#mk-miss").onclick=()=>{show("practice");pStart("miss")};
   $("#mk-wrong").onclick=e=>{const w=e.target.dataset.w!=="1";rev(w);e.target.dataset.w=w?"1":"0";e.target.textContent=w?"Show all questions":"Show only the ones I got wrong"};
@@ -1483,9 +1524,9 @@ function statsRender(){
   $("#theme-btn").onclick=()=>{const dark=root.dataset.theme?root.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;const next=dark?"light":"dark";root.dataset.theme=next;store.set("idta-theme",next)};
 })();
 function toast(msg){const t=document.createElement("div");t.className="toast";t.setAttribute("role","status");t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
-const SHARE_URL=(location.protocol==="https:"&&!/claude/.test(location.hostname))?location.origin+location.pathname.replace(/index\.html$/,""):"https://ajinkyarodge66.github.io/idta-revision/";
+const SHARE_URL=(location.protocol==="https:"&&!/claude/.test(location.hostname))?location.origin+location.pathname.replace(/index\.html$/,""):SITE_URL[EDITION];
 $("#share-btn").onclick=()=>{
-  const text=`Free AI & machine learning course with practice questions, timed mock exams, Calc Lab and flashcards (University of Portsmouth IDTA students: unlock your module pack too) → ${SHARE_URL}`;
+  const text=EDITION==="global"?`Learn AI & machine learning fast and get job-ready: free lessons, memory tricks, portfolio projects, interview prep and timed exams → ${SHARE_URL}`:`Free AI & machine learning course with practice questions, timed mock exams, Calc Lab and flashcards (University of Portsmouth IDTA students: unlock your module pack too) → ${SHARE_URL}`;
   const done=()=>toast("Link copied. Paste it into your group chat.");
   try{navigator.clipboard.writeText(text).then(done,()=>toast(SHARE_URL))}catch(e){toast(SHARE_URL)}
 };
@@ -1561,7 +1602,7 @@ $("#must-reset").onclick=()=>{$("#must-confirm").innerHTML=`<span class="confirm
 
 /* ================= accounts, sync & class features ================= */
 const SYNC_URL = "https://script.google.com/macros/s/AKfycby-OwGobl9mg0MgXzQ5Y5llc4vTx3Az62l1Yq6ET7ilR4AjypOTRb9mY6RRlBHHTaOp/exec";   // Google Apps Script web-app URL; empty = accounts off (app works locally)
-const PROG_KEYS = ["idta-hist","idta-mocks","idta-miss","idta-must","idta-lab","idta-best","idta-lessons","idta-srs","idta-days","idta-goal","idta-examdate"];
+const PROG_KEYS = ["idta-hist","idta-mocks","idta-miss","idta-must","idta-lab","idta-best","idta-lessons","idta-srs","idta-days","idta-goal","idta-examdate","idta-career"];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ERR = {
   network:"Can't reach the server. Check your internet connection and try again.",
@@ -1671,6 +1712,7 @@ function mergeProgress(a, b) {
   Object.keys(db).forEach(k => { out["idta-days"][k] = Math.max(out["idta-days"][k] || 0, db[k] || 0); });
   out["idta-goal"] = a["idta-goal"] != null ? a["idta-goal"] : b["idta-goal"] != null ? b["idta-goal"] : null;
   out["idta-examdate"] = a["idta-examdate"] || b["idta-examdate"] || null;
+  out["idta-career"] = [...new Set([...(a["idta-career"] || []), ...(b["idta-career"] || [])])];
   return out;
 }
 function applyProgress(p) {
@@ -1719,9 +1761,9 @@ recordLab = (k, ok) => { _recordLab(k, ok); track({ t:"lab", k, topic:GEN[k] && 
 const trackMock = (s, n) => track({ t:"mock", s, n, k:MK.session || "" });
 
 /* ---------- sign-in screens ---------- */
-const CC = [["44","🇬🇧 +44"],["91","🇮🇳 +91"],["92","🇵🇰 +92"],["880","🇧🇩 +880"],["94","🇱🇰 +94"],["977","🇳🇵 +977"],["234","🇳🇬 +234"],["233","🇬🇭 +233"],["86","🇨🇳 +86"],["971","🇦🇪 +971"],["966","🇸🇦 +966"],["60","🇲🇾 +60"],["353","🇮🇪 +353"],["1","🇺🇸 +1"]];
+const CC = (() => { const seen = new Set(), out = []; COUNTRIES.forEach(([c, n, d]) => { if (!seen.has(d)) { seen.add(d); out.push([d, flagOf(c) + " +" + d]); } }); return out; })();
 function mobileField(id, val) {
-  const last = store.get("idta-cc", "44");
+  const last = store.get("idta-cc", EDITION === "global" ? ((COUNTRIES.find(c => c[0] === guessCountry()) || [0, 0, "91"])[2]) : "44");
   return `<div class="field"><label for="${id}">Mobile number</label><div class="phone"><select id="${id}-cc" aria-label="Country code">${CC.map(([v, l]) => `<option value="${v}" ${v === last ? "selected" : ""}>${l}</option>`).join("")}</select><input id="${id}" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="${esc(val || "")}"></div></div>`;
 }
 function readMobile(id) {
@@ -1730,6 +1772,17 @@ function readMobile(id) {
   if (n.startsWith(cc) && n.length > 10) n = n.slice(cc.length);   // they typed the code too
   n = n.replace(/^0+/, "");                                          // drop the trunk 0 (UK 07…)
   return n.length >= 6 && n.length <= 13 ? cc + n : "";
+}
+const countryField = (id, val) => `<div class="field"><label for="${id}">Country you live or study in</label><select id="${id}" class="sel" style="width:100%" autocomplete="country"><option value="">Choose your country…</option>${COUNTRIES.slice().sort((a, b) => a[1].localeCompare(b[1])).map(([c, n, d]) => `<option value="${c}" ${c === val ? "selected" : ""}>${flagOf(c)} ${esc(n)} (+${d})</option>`).join("")}</select></div>`;
+function bindCountry(sel, mob, note) {
+  const upd = () => {
+    const c = $(sel).value, row = COUNTRIES.find(x => x[0] === c);
+    if (row && $(mob + "-cc")) $(mob + "-cc").value = row[2];
+    const n = note && $(note); if (!n) return;
+    const reg = c && regionFor(c);
+    n.innerHTML = !c ? "" : EDITION === "uk" && c !== "GB" ? `<p class="cnote">🌍 You'll continue on <b>JobReady AI</b>, our international edition${reg ? ` with prices for ${esc(countryName(c))} (${esc(reg.label)})` : ""} and job-ready extras. Same account.</p>` : EDITION === "global" && c === "GB" ? `<p class="cnote">🇬🇧 In the UK? Our UK edition is <a href="${SITE_URL.uk}">IDTA Revision</a> (University of Portsmouth packs and UK prices). You can use either with the same account.</p>` : reg ? `<p class="cnote">Exam unlock price for ${esc(countryName(c))}: <b>${esc(reg.label)}</b></p>` : "";
+  };
+  $(sel).addEventListener("change", upd); upd();
 }
 const field = (id, label, type, extra = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" ${extra}></div>`;
 const PRIVACY = `<details class="privacy"><summary>How your details are used</summary><p>Your name, mobile number, email, university and course are stored in a private Google Sheet run by the group organiser, together with your quiz results (right/wrong, topic, mock scores) and your saved progress. They're used to log you in, keep your progress across devices, send password-reset codes to your email, show the class leaderboard (name, course and scores only, and only if you choose) and show the organiser which topics the class finds hard. Your password is never stored or sent in readable form. Nothing is shared with anyone else. You can hide yourself from the leaderboard or delete your account and all its data at any time in the Account tab.</p></details>`;
@@ -1754,13 +1807,15 @@ function authRender(msg) {
       });
     };
   } else if (authMode === "signup") {
-    box.innerHTML = `<h2>Create your account</h2>${note}${store.get("idta-ref", "") ? `<p class="invite-note">🎁 A friend invited you. Welcome!</p>` : ""}<form id="f-signup" novalidate>${field("su-name","Full name (shown on the leaderboard if you choose)","text",'autocomplete="name" maxlength="40"')}${mobileField("su-mobile")}${field("su-email","Email (for password reset codes)","email",'autocomplete="email" maxlength="100"')}${field("su-uni","University name","text",'list="uni-list" maxlength="80" autocomplete="organization"')}<datalist id="uni-list"><option value="University of Portsmouth"></datalist>${field("su-course","Course","text",'list="course-list" maxlength="80"')}<datalist id="course-list"><option value="MSc Data Science"><option value="MSc Data Analytics"><option value="MSc Artificial Intelligence"><option value="MSc Computer Science"><option value="BSc Computer Science"></datalist>${field("su-pw","Create password (min 8 characters)","password",'autocomplete="new-password"')}${field("su-pw2","Confirm password","password",'autocomplete="new-password"')}
+    box.innerHTML = `<h2>Create your account</h2>${note}${store.get("idta-ref", "") ? `<p class="invite-note">🎁 A friend invited you. Welcome!</p>` : ""}<form id="f-signup" novalidate>${field("su-name","Full name (shown on the leaderboard if you choose)","text",'autocomplete="name" maxlength="40"')}${countryField("su-country", guessCountry())}<div id="su-cnote"></div>${mobileField("su-mobile")}${field("su-email","Email (for password reset codes)","email",'autocomplete="email" maxlength="100"')}${field("su-uni","University name","text",'list="uni-list" maxlength="80" autocomplete="organization"')}<datalist id="uni-list"><option value="University of Portsmouth"></datalist>${field("su-course","Course","text",'list="course-list" maxlength="80"')}<datalist id="course-list"><option value="MSc Data Science"><option value="MSc Data Analytics"><option value="MSc Artificial Intelligence"><option value="MSc Computer Science"><option value="BSc Computer Science"></datalist>${field("su-pw","Create password (min 8 characters)","password",'autocomplete="new-password"')}${field("su-pw2","Confirm password","password",'autocomplete="new-password"')}
       <label class="check"><input type="checkbox" id="su-lb" checked><span>Show my name, course and scores on the class leaderboard</span></label>
       <label class="check"><input type="checkbox" id="su-ok"><span>I agree that my details and results are stored as described below</span></label>${PRIVACY}
       <button class="btn primary wide" type="submit">Create account</button></form><div class="auth-links"><button class="linkbtn" data-m="login">I already have an account</button></div>`;
+    bindCountry("#su-country", "#su-mobile", "#su-cnote");
     $("#f-signup").onsubmit = async e => {
       e.preventDefault();
-      const name = $("#su-name").value.trim(), mobile = readMobile("su-mobile"), email = $("#su-email").value.trim();
+      const name = $("#su-name").value.trim(), country = $("#su-country").value, mobile = readMobile("su-mobile"), email = $("#su-email").value.trim();
+      if (!country) return authMsg({ text:"Choose the country you live or study in." });
       const university = $("#su-uni").value.trim(), course = $("#su-course").value.trim(), pw = $("#su-pw").value, pw2 = $("#su-pw2").value;
       const bad = name.length < 2 ? "bad_name" : !mobile ? "bad_mobile" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? "bad_email" : university.length < 2 ? "bad_university" : course.length < 2 ? "bad_course" : pw.length < 8 ? "bad_password" : null;
       if (bad) return authMsg({ text:ERR[bad] });
@@ -1769,10 +1824,11 @@ function authRender(msg) {
       const lb = $("#su-lb").checked;
       await busy(e.target.querySelector("button[type=submit]"), "Creating account…", async () => {
         let d; try { d = await derivePw(pw, mobile); } catch (x) { return authMsg({ text:ERR.no_crypto }); }
-        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true, ref:store.get("idta-ref", ""), src:store.get("idta-src", ""), dev:deviceKind() });
+        const r = await api("signup", { name, mobile, email, university, course, pw:d, lb, consent:true, ref:store.get("idta-ref", ""), src:store.get("idta-src", ""), dev:deviceKind(), country, site:EDITION });
         if (!r.ok) return authMsg({ text:errMsg(r.error) });
         try { localStorage.removeItem("idta-ref"); } catch (x) {}
         signInDone(r, "Account created. Welcome, " + r.profile.name + "!");
+        if (EDITION === "uk" && country !== "GB") { toast("Taking you to JobReady AI, our international edition…"); setTimeout(() => { location.href = SITE_URL.global; }, 1600); }
       });
     };
   } else if (authMode === "forgot") {
@@ -1817,8 +1873,19 @@ function signInDone(r, msg) {
   const merged = mergeProgress(getProgress(), r.progress);
   applyProgress(merged);
   lock(false); acctBadge(); syncTabs();
-  saveProgress(); flush(); loadPack();
+  saveProgress(); flush(); loadPack(); editionHint();
   toast(msg);
+}
+function editionHint() {
+  const box = $("#ed-hint"); if (!box) return;
+  const a = AUTH.get(), p = a && a.profile; box.innerHTML = "";
+  if (!p || !p.country || store.get("idta-ed-hint-off", false)) return;
+  let html = "";
+  if (EDITION === "uk" && p.country !== "GB" && !p.verifiedUni) html = `🌍 <span>You're in ${flagOf(p.country)} ${esc(countryName(p.country))}. <b>JobReady AI</b> is our international edition with local prices, portfolio projects and interview prep. Same account, so you're already logged in.</span><a class="btn small primary" href="${SITE_URL.global}">Open JobReady AI</a>`;
+  else if (EDITION === "global" && p.country === "GB") html = `🇬🇧 <span>Studying in the UK? <b>IDTA Revision</b> is our UK edition with UK prices and university packs. Same account.</span><a class="btn small" href="${SITE_URL.uk}">Open IDTA Revision</a>`;
+  if (!html) return;
+  box.innerHTML = `<div class="news ed-news" role="status">${html}<button class="iconbtn" id="ed-x" aria-label="Dismiss">Dismiss</button></div>`;
+  $("#ed-x").onclick = () => { store.set("idta-ed-hint-off", true); box.innerHTML = ""; };
 }
 function sessionExpired() {
   if (!AUTH.get()) return;
@@ -1838,6 +1905,7 @@ function acctBadge() {
   if (a) b.textContent = (a.profile.name || "Account").split(" ")[0];
 }
 function syncTabs() {
+  if (EDITION === "global") { const u = $("#tab-uni"); if (u) u.hidden = true; }
   $("#tab-class").hidden = !SYNC_URL;
   $("#tab-account").hidden = !signedIn();
   $("#tab-refer").hidden = !signedIn();
@@ -1852,15 +1920,15 @@ async function purchaseRender() {
   const d = s => new Date(s).toLocaleDateString([], { day:"numeric", month:"short", year:"numeric" });
   const rf = r.refund, policy = `<p class="hint" style="margin-bottom:0">Refund policy: a full refund if you cancel before starting your first course exam. Once you start an exam, the payment is non-refundable.</p>`;
   let inner;
-  if (rf && rf.status === "pending") inner = `<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Refund requested: £${rf.amount}</b><span>Requested ${d(rf.requested)}. The organiser will send it to you and email you when it's done.</span></div></div>`;
-  else if (r.access && r.refundable) inner = `<p><span class="badge ok">✓ Unlocked</span> You paid <b>£${r.paid}</b>. You haven't started a course exam yet, so you can cancel for a full refund.</p>
+  if (rf && rf.status === "pending") inner = `<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Refund requested: ${fmtCur(rf.amount, rf.cur)}</b><span>Requested ${d(rf.requested)}. The organiser will send it to you and email you when it's done.</span></div></div>`;
+  else if (r.access && r.refundable) inner = `<p><span class="badge ok">✓ Unlocked</span> You paid <b>${fmtCur(r.paid, r.cur)}</b>. You haven't started a course exam yet, so you can cancel for a full refund.</p>
     <div id="rf-box"><button class="btn" id="rf-open">Cancel and request a refund…</button></div>${policy}`;
-  else if (r.access) inner = `<p><span class="badge ok">✓ Unlocked</span> ${r.paid ? `You paid £${r.paid}. You've started a course exam, so this payment is no longer refundable.` : "Unlocked with a free code or by the organiser."}</p>${r.paid ? "" : policy}`;
-  else inner = `${rf ? `<p>${rf.status === "refunded" ? `<span class="badge ok">Refunded</span> £${rf.amount} was sent back to you on ${d(rf.requested)}.` : rf.status === "declined" ? `<span class="badge warn">Refund declined</span> ${esc(rf.note || "")}` : ""}</p>` : ""}<p>The course exams are locked. <button class="linkbtn" id="rf-unlock">Unlock them on the Mock exam tab</button></p>${policy}`;
+  else if (r.access) inner = `<p><span class="badge ok">✓ Unlocked</span> ${r.paid ? `You paid ${fmtCur(r.paid, r.cur)}. You've started a course exam, so this payment is no longer refundable.` : "Unlocked with a free code or by the organiser."}</p>${r.paid ? "" : policy}`;
+  else inner = `${rf ? `<p>${rf.status === "refunded" ? `<span class="badge ok">Refunded</span> ${fmtCur(rf.amount, rf.cur)} was sent back to you on ${d(rf.requested)}.` : rf.status === "declined" ? `<span class="badge warn">Refund declined</span> ${esc(rf.note || "")}` : ""}</p>` : ""}<p>The course exams are locked. <button class="linkbtn" id="rf-unlock">Unlock them on the Mock exam tab</button></p>${policy}`;
   box.innerHTML = `<div class="card" style="margin-bottom:1rem"><h2>Course exams</h2>${inner}</div>`;
   if ($("#rf-unlock")) $("#rf-unlock").onclick = () => show("mock");
   if ($("#rf-open")) $("#rf-open").onclick = () => {
-    $("#rf-box").innerHTML = `<div class="confirmbar" style="display:block"><p style="margin-top:0"><b>Cancel and get £${r.paid} back.</b> Your exam access ends straight away.</p>
+    $("#rf-box").innerHTML = `<div class="confirmbar" style="display:block"><p style="margin-top:0"><b>Cancel and get ${fmtCur(r.paid, r.cur)} back.</b> Your exam access ends straight away.</p>
       ${field("rf-to", "Where should we send your refund? (UPI ID, PayPal email or bank details)", "text", 'maxlength="100" autocomplete="off"')}
       <div class="field"><label for="rf-why">Why are you cancelling? (optional)</label><textarea id="rf-why" rows="2" maxlength="200"></textarea></div>
       <div id="rf-msg"></div><div class="qnav" style="justify-content:flex-start;gap:.5rem"><button class="btn danger" id="rf-yes">Cancel and request refund</button><button class="btn" id="rf-no">Keep my access</button></div></div>`;
@@ -1874,6 +1942,8 @@ async function purchaseRender() {
     });
   };
 }
+
+
 
 /* ---------- Refer & earn ---------- */
 async function referRender() {
@@ -1908,7 +1978,8 @@ function accountRender() {
     ${field("pf-name","Full name","text",`maxlength="40" value="${esc(p.name)}"`)}
     <div class="field"><label>Mobile number</label><input value="+${esc(p.mobile)}" disabled></div>
     <div class="field"><label>Email</label><input value="${esc(p.email)}" disabled></div>
-    <div class="field"><label>University verification</label><div>${p.verifiedUni ? `<span class="badge ok">✓ Verified</span> ${esc(p.verifiedUni)} · ${esc(p.uniEmail || "")}` : `Not verified. <button class="linkbtn" type="button" id="pf-verify">Verify in My university</button>`}</div></div>
+    ${EDITION === "global" ? "" : `<div class="field"><label>University verification</label><div>${p.verifiedUni ? `<span class="badge ok">✓ Verified</span> ${esc(p.verifiedUni)} · ${esc(p.uniEmail || "")}` : `Not verified. <button class="linkbtn" type="button" id="pf-verify">Verify in My university</button>`}</div></div>`}
+    ${countryField("pf-country", p.country || "")}
     ${field("pf-uni","University name","text",`maxlength="80" value="${esc(p.university)}"`)}
     ${field("pf-course","Course","text",`maxlength="80" value="${esc(p.course)}"`)}
     <label class="check"><input type="checkbox" id="pf-lb" ${p.lb ? "checked" : ""}><span>Show me on the class leaderboard</span></label>
@@ -1929,7 +2000,7 @@ function accountRender() {
   $("#f-prof").onsubmit = async e => {
     e.preventDefault();
     await busy(e.target.querySelector("button"), "Saving…", async () => {
-      const r = await api("updateProfile", { token:AUTH.token(), name:$("#pf-name").value.trim(), university:$("#pf-uni").value.trim(), course:$("#pf-course").value.trim(), lb:$("#pf-lb").checked });
+      const r = await api("updateProfile", { token:AUTH.token(), name:$("#pf-name").value.trim(), university:$("#pf-uni").value.trim(), course:$("#pf-course").value.trim(), lb:$("#pf-lb").checked, country:$("#pf-country").value });
       if (r.error === "auth") return sessionExpired();
       if (!r.ok) return msg("pf-msg", false, errMsg(r.error));
       AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); msg("pf-msg", true, "Saved.");
@@ -2082,7 +2153,7 @@ function adminOverview(d) {
   $("#ad-body").innerHTML = `<div class="qnav" style="justify-content:flex-start;gap:.5rem;margin-top:0"><button class="btn" id="ad-refresh">Refresh</button><span class="hint">${d.rows} activity rows · student details are personal data, so keep them private</span></div>
   <div class="tiles"><div class="tile"><div class="label">Accounts</div><div class="big">${users.length}</div><div class="sub">${users.filter(u => u.lb).length} on leaderboard</div></div><div class="tile"><div class="label">Active</div><div class="big">${users.filter(u => u.last > dayAgo).length}</div><div class="sub">last 24 h · ${users.filter(u => u.last > weekAgo).length} this week</div></div><div class="tile"><div class="label">Class accuracy</div><div class="big">${totQ ? Math.round(totR / totQ * 100) + "%" : "–"}</div><div class="sub">${totQ} answers · ${totM} mocks</div></div></div>
   <div class="search" style="margin-top:.5rem"><input type="search" id="ad-filter" placeholder="Filter students by name, mobile, email, university or course" aria-label="Filter students"><span class="score" id="ad-count"></span></div>
-  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Exam</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td><button class="linkbtn" data-stu="${esc(u.id)}">${esc(u.name)}</button></td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${u.examAccess ? `<span class="badge ok" title="${esc(u.examAccess)}">✓ Unlocked</span> <button class="btn small" data-exam="${esc(u.id)}" data-on="">Remove</button>` : `<span class="nowrap"><button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="${priceNum()}">Paid ${esc(priceTxt())}</button> <button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="0">Free</button></span>`}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Students</h2><div class="tbl"><table id="ad-table"><tr><th>Name</th><th>Mobile</th><th>Email</th><th>University</th><th>Verified</th><th>Exam</th><th>Course</th><th>Joined</th><th>Last active</th><th>Questions</th><th>Accuracy</th><th>Best mock</th><th>Mocks</th><th>Calc Lab</th><th>Board</th></tr>${users.map(u => `<tr data-s="${esc((u.name + " " + u.mobile + " " + u.email + " " + u.university + " " + (u.verifiedUni || "") + " " + u.course).toLowerCase())}"><td><button class="linkbtn" data-stu="${esc(u.id)}">${esc(u.name)}</button>${u.country ? ` <span title="${esc(countryName(u.country))}">${flagOf(u.country)}</span>` : ""}${u.site === "global" ? ` <span class="badge site-g" title="Signed up on JobReady AI">JR</span>` : ""}</td><td class="num">+${esc(u.mobile)}</td><td>${esc(u.email)}</td><td>${esc(u.university)}</td><td>${u.verifiedUni ? `<span class="badge ok">✓ ${esc(u.verifiedUni)}</span> <button class="btn small" data-acc="${esc(u.id)}" data-uni="">Revoke</button>` : (packUnis().length ? packUnis().map(x => `<button class="btn small" data-acc="${esc(u.id)}" data-uni="${esc(x.name)}">Grant ${esc(x.name.replace(/^University of /, ""))}</button>`).join(" ") : "–")}</td><td>${u.examAccess ? `<span class="badge ok" title="${esc(u.examAccess)}">✓ Unlocked</span> <button class="btn small" data-exam="${esc(u.id)}" data-on="">Remove</button>` : `<span class="nowrap"><button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="region">Paid ${esc((regionFor(u.country || "GB") || {}).label || priceTxt())}</button> <button class="btn small" data-exam="${esc(u.id)}" data-on="1" data-amt="0">Free</button></span>`}</td><td>${esc(u.course)}</td><td>${fmtDate(u.created)}</td><td>${u.last ? ago(u.last) : "never"}</td><td class="num">${u.q}</td><td class="num">${u.q ? Math.round(u.qr / u.q * 100) + "%" : "–"}</td><td class="num">${u.best != null ? u.best + "/30" : "–"}</td><td class="num">${u.mocks}${u.lastMock ? ` <span class="hint">(last ${esc(u.lastMock)})</span>` : ""}</td><td class="num">${u.lab ? `${u.labr}/${u.lab}` : "–"}</td><td>${u.lb ? "yes" : "hidden"}</td></tr>`).join("") || `<tr><td colspan="14">No accounts yet.</td></tr>`}</table></div></div>
   ${users.length ? `<div class="card" style="margin-bottom:1rem"><h2>Students by course</h2><div class="bars">${Object.keys(byCourse).sort((a, b) => byCourse[b] - byCourse[a]).map(k => `<div class="bar"><span>${esc(k)}</span><span class="track"><span class="fill" style="display:block;width:${byCourse[k] / users.length * 100}%"></span></span><span class="v">${byCourse[k]}</span></div>`).join("")}</div></div>` : ""}
   ${tp.length ? `<div class="card" style="margin-bottom:1rem"><h2>Topic accuracy (whole class)</h2><div class="bars">${tp.map(t => `<div class="bar"><span>${esc(TOPICS[t.k])}</span><span class="track"><span class="fill" style="display:block;width:${t.r / t.n * 100}%;background:${t.r / t.n >= .85 ? "var(--good)" : t.r / t.n >= .6 ? "var(--accent)" : "var(--bad)"}"></span></span><span class="v">${Math.round(t.r / t.n * 100)}% · ${t.n}</span></div>`).join("")}</div></div>` : ""}
   ${hard.length ? `<div class="card" style="margin-bottom:1rem"><h2>Hardest questions</h2><p class="hint">Lowest class accuracy, minimum 3 attempts. Good candidates to go over together, or to fix if the wording is unclear.</p><div class="tbl"><table><tr><th>Accuracy</th><th>Question</th><th>Topic</th></tr>${hard.map(x => `<tr><td class="num">${Math.round(x.r / x.n * 100)}% (${x.r}/${x.n})</td><td>${esc(Q[x.id].p.length > 120 ? Q[x.id].p.slice(0, 120) + "…" : Q[x.id].p)}</td><td>${esc(TOPICS[Q[x.id].t])}</td></tr>`).join("")}</table></div></div>` : ""}
@@ -2100,7 +2171,7 @@ function adminOverview(d) {
   $("#ad-table").querySelectorAll("[data-exam]").forEach(b => b.onclick = async () => {
     if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = b.dataset.on ? "Click to confirm" : "Click to confirm remove"; return; }
     await busy(b, "Saving…", async () => {
-      const r = await api("adminSetExam", { key:store.get("idta-admin-key", ""), id:b.dataset.exam, on:!!b.dataset.on, amount:+(b.dataset.amt || 0) });
+      const r = await api("adminSetExam", { key:store.get("idta-admin-key", ""), id:b.dataset.exam, on:!!b.dataset.on, amount:b.dataset.amt === "region" ? "region" : +(b.dataset.amt || 0) });
       if (!r.ok) return toast(errMsg(r.error));
       toast(b.dataset.on ? "Exam unlocked for this student." : "Exam access removed."); adminRender();
     });
@@ -2136,27 +2207,27 @@ function salesHTML(sl) {
   return `<div class="card" style="margin-bottom:1rem"><h2>Sales</h2>
   <div class="tiles"><div class="tile"><div class="label">Net income</div><div class="big">${money(rev - refunds - payouts)}</div><div class="sub">${money(rev)} in · ${money(refunds)} refunds · ${money(payouts)} referrals</div></div><div class="tile"><div class="label">This month (net)</div><div class="big">${money(revM)}</div><div class="sub">${now.toLocaleDateString([], { month:"long" })}</div></div><div class="tile"><div class="label">Unlocks</div><div class="big">${sales.length}</div><div class="sub">${paid} paid · ${free} free</div></div><div class="tile"><div class="label">Conversion</div><div class="big">${conv}%</div><div class="sub">${sl.unlocked} of ${sl.accounts} accounts unlocked</div></div></div>
   <h3 style="margin:1rem 0 .3rem">Revenue, last 30 days</h3>${chart}
-  <h3 style="margin:1rem 0 .3rem">Money in &amp; out</h3>${all.some(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout") ? `<div class="tbl"><table><tr><th>When</th><th>Student</th><th>What</th><th>Amount</th></tr>${all.filter(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout").slice(-40).reverse().map(x => `<tr><td>${ago(x.ts)}</td><td>${esc(x.name)}</td><td>${x.kind === "refund" ? "Refund" : x.kind === "payout" ? "Referral reward" : esc(x.how)}</td><td class="num${x.kind !== "unlock" ? " neg" : ""}">${x.kind !== "unlock" ? "−" + money(x.amount) : x.amount ? money(x.amount) : "free"}</td></tr>`).join("")}</table></div>` : `<p class="hint">No unlocks yet. When a student redeems a code or you press Paid/Free in Overview, it appears here.</p>`}
-  <p class="hint">Amounts are what you recorded (the code's value, or Paid in Overview). Check them against your bank or payment app.</p></div>`;
+  <h3 style="margin:1rem 0 .3rem">Money in &amp; out</h3>${all.some(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout") ? `<div class="tbl"><table><tr><th>When</th><th>Student</th><th>What</th><th>Amount</th></tr>${all.filter(x => x.kind === "unlock" || x.kind === "refund" || x.kind === "payout").slice(-40).reverse().map(x => `<tr><td>${ago(x.ts)}</td><td>${esc(x.name)}</td><td>${x.kind === "refund" ? "Refund" : x.kind === "payout" ? "Referral reward" : esc(x.how)}</td><td class="num${x.kind !== "unlock" ? " neg" : ""}">${x.kind !== "unlock" ? "−" + fmtCur(x.orig != null ? x.orig : x.amount, x.cur || "GBP") : x.amount || x.orig ? fmtCur(x.orig != null ? x.orig : x.amount, x.cur || "GBP") : "free"}${x.cur && x.cur !== "GBP" ? ` <span class="hint">≈ ${money(x.amount)}</span>` : ""}</td></tr>`).join("")}</table></div>` : `<p class="hint">No unlocks yet. When a student redeems a code or you press Paid/Free in Overview, it appears here.</p>`}
+  <p class="hint">Totals are in pounds; payments in other currencies are converted at approximate rates (≈). Amounts are what you recorded, so check them against your bank or payment app.</p></div>`;
 }
 function payQueueHTML(pm) {
   const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
   return `<div class="card pay-q" style="margin-bottom:1rem"><h2>Payments to check ${pm.pending.length ? `<span class="badge warn">${pm.pending.length} waiting</span>` : ""}</h2>
   ${pm.pending.length ? pm.pending.map(p => `<div class="pay-item" data-pid="${esc(p.id)}"><div class="pay-main"><b>${esc(p.name)}</b><span>${esc(p.mobile)} · ${when(p.submitted)}${p.ref ? ` · ref <code>${esc(p.ref)}</code>` : ""}</span>
     <button class="btn small" data-pview="${esc(p.id)}">View screenshot</button><div class="pay-img" id="img-${esc(p.id)}"></div></div>
-    <div class="pay-act"><label class="sr-only" for="amt-${esc(p.id)}">Amount</label><span class="amt">£<input id="amt-${esc(p.id)}" type="number" min="0" step="0.5" value="${p.amount}"></span><button class="btn primary small" data-appr="${esc(p.id)}">Approve &amp; unlock</button>
+    <div class="pay-act"><label class="sr-only" for="amt-${esc(p.id)}">Amount</label><span class="amt">${esc(p.cur || "GBP")} <input id="amt-${esc(p.id)}" type="number" min="0" step="0.01" value="${p.amount}"></span><button class="btn primary small" data-appr="${esc(p.id)}">Approve &amp; unlock</button>
     <input id="why-${esc(p.id)}" class="why" maxlength="120" placeholder="Reason if rejecting (optional)"><button class="btn small" data-rej="${esc(p.id)}">Reject</button></div></div>`).join("")
     : `<p class="hint">Nothing waiting. New screenshots appear here automatically, and you also get an email.</p>`}
-  ${pm.recent.length ? `<details class="pay-recent"><summary>Recent decisions (${pm.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Ref</th><th>Result</th><th>When</th></tr>${pm.recent.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${money(p.amount)}</td><td>${esc(p.ref || "–")}</td><td>${p.status === "approved" ? `<span class="badge ok">Approved</span>` : `<span class="badge warn">Rejected</span>${p.note ? " " + esc(p.note) : ""}`}</td><td>${when(p.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
+  ${pm.recent.length ? `<details class="pay-recent"><summary>Recent decisions (${pm.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Ref</th><th>Result</th><th>When</th></tr>${pm.recent.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${fmtCur(p.amount, p.cur)}</td><td>${esc(p.ref || "–")}</td><td>${p.status === "approved" ? `<span class="badge ok">Approved</span>` : `<span class="badge warn">Rejected</span>${p.note ? " " + esc(p.note) : ""}`}</td><td>${when(p.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
 }
 function payTabBadge(n) { n += AD.other || 0; const b = document.querySelector('#admin-root [data-t="exam"]'); if (b) b.innerHTML = "Exam &amp; coupons" + (n ? ` <span class="tab-dot">${n}</span>` : ""); }
 function refundQueueHTML(rq) {
   const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
   if (!rq.pending.length && !rq.recent.length) return "";
   return `<div class="card" style="margin-bottom:1rem"><h2>Refund requests ${rq.pending.length ? `<span class="badge warn">${rq.pending.length} to pay</span>` : ""}</h2>
-  ${rq.pending.length ? `<p class="hint">Their exam access is already removed. Send the money, then click <b>Mark refunded</b>. <b>Decline</b> gives their access back.</p>` + rq.pending.map(x => `<div class="pay-item"><div class="pay-main"><b>${esc(x.name)} · £${x.amount}</b><span>${esc(x.mobile)} · ${when(x.requested)}</span><span>Send to: <code>${esc(x.to)}</code></span>${x.reason ? `<span>Reason: ${esc(x.reason)}</span>` : ""}</div>
+  ${rq.pending.length ? `<p class="hint">Their exam access is already removed. Send the money, then click <b>Mark refunded</b>. <b>Decline</b> gives their access back.</p>` + rq.pending.map(x => `<div class="pay-item"><div class="pay-main"><b>${esc(x.name)} · ${fmtCur(x.amount, x.cur)}</b><span>${esc(x.mobile)} · ${when(x.requested)}</span><span>Send to: <code>${esc(x.to)}</code></span>${x.reason ? `<span>Reason: ${esc(x.reason)}</span>` : ""}</div>
     <div class="pay-act"><button class="btn primary small" data-rfd="${esc(x.id)}">Mark refunded</button><input id="rfn-${esc(x.id)}" class="why" maxlength="120" placeholder="Reason if declining"><button class="btn small" data-rfx="${esc(x.id)}">Decline</button></div></div>`).join("") : `<p class="hint">No refunds waiting.</p>`}
-  ${rq.recent.length ? `<details class="pay-recent"><summary>Recent refunds (${rq.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Result</th><th>When</th></tr>${rq.recent.map(x => `<tr><td>${esc(x.name)}</td><td class="num">£${x.amount}</td><td>${x.status === "refunded" ? `<span class="badge ok">Refunded</span>` : `<span class="badge warn">Declined</span> ${esc(x.note || "")}`}</td><td>${when(x.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
+  ${rq.recent.length ? `<details class="pay-recent"><summary>Recent refunds (${rq.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Result</th><th>When</th></tr>${rq.recent.map(x => `<tr><td>${esc(x.name)}</td><td class="num">${fmtCur(x.amount, x.cur)}</td><td>${x.status === "refunded" ? `<span class="badge ok">Refunded</span>` : `<span class="badge warn">Declined</span> ${esc(x.note || "")}`}</td><td>${when(x.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
 }
 function referralAdminHTML(rr) {
   const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
@@ -2218,12 +2289,13 @@ function miniBars(title, keys, vals, unit, avg) {
 }
 async function adminAnalytics() {
   const key = store.get("idta-admin-key", ""), body = $("#ad-body"), days = AD.range || 30;
-  const a = await api("adminAnalytics", { key, days });
+  const site = AD.site || "";
+  const a = await api("adminAnalytics", { key, days, site });
   if (!a.ok) { body.innerHTML = `<p class="hint">${a.error === "unknown_action" ? "Update Code.gs in Apps Script to see analytics." : esc(errMsg(a.error))}</p>`; return; }
   const f = a.funnel, steps = [["Visitors", f.visits, "logged-out visits to the site"], ["Signed up", f.signups, "created an account"], ["Studied", f.studied, "answered at least one question"], ["Unlocked exams", f.unlocked, "paid or used a code"], ["Took an exam", f.exams, "finished a mock or exam"], ["Got a certificate", f.certs, "passed with 70%+"]];
   const top = Math.max(1, ...steps.map(x => x[1]));
   const e = a.engagement, r = a.retention, devRow = o => { const t = Object.values(o).reduce((s, x) => s + x, 0); return ["phone", "tablet", "desktop", "unknown"].filter(k => o[k]).map(k => `<div class="bar"><span>${{ phone:"📱 Phone", tablet:"Tablet", desktop:"💻 Laptop / desktop", unknown:"Unknown" }[k]}</span><span class="track"><span class="fill" style="display:block;width:${o[k] / t * 100}%"></span></span><span class="v">${o[k]} · ${pct(o[k], t)}</span></div>`).join("") || `<p class="hint">No data yet.</p>`; };
-  body.innerHTML = `<div class="filters" role="group" aria-label="Time range" style="margin-bottom:1rem">${[7, 30, 90, 365].map(d => `<button aria-pressed="${d === days}" data-range="${d}">${d === 365 ? "12 months" : "Last " + d + " days"}</button>`).join("")}</div>
+  body.innerHTML = `<div class="filters" role="group" aria-label="Website" style="margin-bottom:.5rem">${[["", "Both websites"], ["uk", "IDTA Revision (UK)"], ["global", "JobReady AI"]].map(([k, l]) => `<button aria-pressed="${k === site}" data-site="${k}">${l}</button>`).join("")}</div><div class="filters" role="group" aria-label="Time range" style="margin-bottom:1rem">${[7, 30, 90, 365].map(d => `<button aria-pressed="${d === days}" data-range="${d}">${d === 365 ? "12 months" : "Last " + d + " days"}</button>`).join("")}</div>
   <div class="card" style="margin-bottom:1rem"><h2>Sign-up funnel</h2><p class="hint">People who signed up in this period and how far they got. Visitors are counted once per browser session, without cookies or IDs.</p>
   <div class="funnel">${steps.map((x, i) => `<div class="fn-row"><div class="fn-l"><b>${x[0]}</b><span>${x[2]}</span></div><div class="fn-track"><span style="width:${Math.max(x[1] ? 1.5 : 0, x[1] / top * 100)}%"></span></div><div class="fn-v"><b>${x[1]}</b>${i && steps[i - 1][1] ? `<span>${pct(x[1], steps[i - 1][1])} of previous</span>` : ""}</div></div>`).join("")}</div>
   <p class="hint">Visitor → sign-up: <b>${pct(f.signups, f.visits)}</b> · sign-up → paid: <b>${pct(f.unlocked, f.signups)}</b></p></div>
@@ -2233,8 +2305,10 @@ async function adminAnalytics() {
   <div class="ref-link"><input id="an-tag" maxlength="30" placeholder="e.g. msc-ai-whatsapp" aria-label="Name for a tracked link"><input id="an-link" readonly aria-label="Tracked link" value="${esc(SHARE_URL)}?src=…"><button class="btn" id="an-copy">Copy link</button></div></div>
   <div class="card" style="margin-bottom:1rem"><h2>Engagement</h2><div class="tiles"><div class="tile"><div class="label">Active today</div><div class="big">${e.dau}</div><div class="sub">studied in the last 24 h</div></div><div class="tile"><div class="label">This week</div><div class="big">${e.wau}</div><div class="sub">last 7 days</div></div><div class="tile"><div class="label">This month</div><div class="big">${e.mau}</div><div class="sub">last 30 days</div></div><div class="tile"><div class="label">Study days</div><div class="big">${e.avgDays}</div><div class="sub">average per active student</div></div><div class="tile"><div class="label">Study time</div><div class="big">${e.avgMinutes} min</div><div class="sub">average per active student (estimate)</div></div></div>
   <div class="dev-cols"><div><h3>Sign-ups by device</h3><div class="bars">${devRow(a.devices.signups)}</div></div><div><h3>Visits by device</h3><div class="bars">${devRow(a.devices.visits)}</div></div></div></div>
+  ${(a.countries || []).length ? `<div class="card" style="margin-bottom:1rem"><h2>Sign-ups by country</h2><div class="bars">${a.countries.map(([c, n]) => `<div class="bar"><span>${c === "??" ? "Not set" : flagOf(c) + " " + esc(countryName(c))}</span><span class="track"><span class="fill" style="display:block;width:${n / a.countries[0][1] * 100}%"></span></span><span class="v">${n}</span></div>`).join("")}</div></div>` : ""}
   <div class="card"><h2>Retention</h2><p class="hint">Of students who signed up long enough ago, the share who studied again after…</p><div class="tiles">${[["1 day", r.d1], ["7 days", r.d7], ["30 days", r.d30]].map(([l, x]) => `<div class="tile"><div class="label">After ${l}</div><div class="big">${pct(x.back, x.pool)}</div><div class="sub">${x.back} of ${x.pool} students</div></div>`).join("")}</div></div>`;
   body.querySelectorAll("[data-range]").forEach(b => b.onclick = () => { AD.range = +b.dataset.range; adminAnalytics(); });
+  body.querySelectorAll("[data-site]").forEach(b => b.onclick = () => { AD.site = b.dataset.site; adminAnalytics(); });
   const tagLink = () => { const t = $("#an-tag").value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, ""); $("#an-link").value = SHARE_URL + "?src=" + (t || "…"); return t; };
   $("#an-tag").oninput = tagLink;
   $("#an-copy").onclick = async () => { if (!tagLink()) return toast("Type a name for the link first."); try { await navigator.clipboard.writeText($("#an-link").value); toast("Tracked link copied."); } catch (x) { $("#an-link").select(); } };
@@ -2261,7 +2335,7 @@ async function adminStudentView(id) {
   const rf = d.referrals;
   body.innerHTML = `<button class="btn" id="st-back">← All students</button>
   <div class="card stu-head" style="margin:1rem 0"><div><h1 style="margin:0 0 .3rem">${esc(p.name)}</h1><p class="hint" style="margin:0">+${esc(p.mobile)} · ${esc(p.email)} · ${esc(p.university)} · ${esc(p.course)}</p>
-    <div class="stu-tags">${p.verifiedUni ? `<span class="badge ok">✓ ${esc(p.verifiedUni)}</span>` : ""}${p.exam ? `<span class="badge ok">Exams unlocked</span>` : `<span class="badge">Exams locked</span>`}${p.examUsed ? `<span class="badge">Started an exam ${fmt(p.examUsed)}</span>` : ""}<span class="badge">Source: ${esc(p.src || "unknown")}</span><span class="badge">${esc(p.dev || "unknown device")}</span>${p.referredBy ? `<span class="badge">Invited by ${esc(p.referredBy)}</span>` : ""}</div></div></div>
+    <div class="stu-tags">${p.verifiedUni ? `<span class="badge ok">✓ ${esc(p.verifiedUni)}</span>` : ""}${p.exam ? `<span class="badge ok">Exams unlocked</span>` : `<span class="badge">Exams locked</span>`}${p.examUsed ? `<span class="badge">Started an exam ${fmt(p.examUsed)}</span>` : ""}<span class="badge">${p.site === "global" ? "JobReady AI" : "IDTA Revision"}</span>${p.country ? `<span class="badge">${flagOf(p.country)} ${esc(countryName(p.country))}</span>` : ""}<span class="badge">Source: ${esc(p.src || "unknown")}</span><span class="badge">${esc(p.dev || "unknown device")}</span>${p.referredBy ? `<span class="badge">Invited by ${esc(p.referredBy)}</span>` : ""}</div></div></div>
   <div class="tiles"><div class="tile"><div class="label">Joined</div><div class="big sm">${fmt(p.created)}</div><div class="sub">last active ${last ? ago(last) : "never"}</div></div><div class="tile"><div class="label">Study days</div><div class="big">${studyDays.length}</div><div class="sub">different days with activity</div></div><div class="tile"><div class="label">Questions</div><div class="big">${qs.length}</div><div class="sub">${pct(right, qs.length)} correct</div></div><div class="tile"><div class="label">Exams</div><div class="big">${mocks.length}</div><div class="sub">${mocks.length ? "best " + Math.max(...mocks.map(x => +x.s)) + "/" + mocks[0].n : "none yet"}</div></div><div class="tile"><div class="label">Lessons</div><div class="big">${d.lessons}</div><div class="sub">completed · ${d.mustTicked} must-know ticked</div></div><div class="tile"><div class="label">Calc Lab</div><div class="big">${labs.length}</div><div class="sub">${pct(labs.filter(x => x.ok === 1).length, labs.length)} fully right</div></div></div>
   <div class="card" style="margin:1rem 0"><h2>Last 30 days</h2><div class="heat" aria-label="Activity per day for the last 30 days">${strip}</div><p class="hint" style="margin-bottom:0">Darker = more answers that day.${d.examDate ? ` Exam date set: <b>${esc(d.examDate)}</b>.` : ""}${d.goal ? ` Daily goal: ${d.goal}.` : ""}</p></div>
   ${Object.keys(per).length ? `<div class="card" style="margin-bottom:1rem"><h2>Accuracy by topic</h2><div class="bars">${Object.keys(per).sort((a, b) => per[a][0] / per[a][1] - per[b][0] / per[b][1]).map(t => `<div class="bar"><span>${esc(TOPICS[t] || t)}</span><span class="track"><span class="fill" style="display:block;width:${per[t][0] / per[t][1] * 100}%"></span></span><span class="v">${per[t][0]}/${per[t][1]}</span></div>`).join("")}</div></div>` : ""}
@@ -2297,6 +2371,9 @@ async function adminExam() {
   ${field("ec-price","Price shown","text",'maxlength="20" placeholder="£3"')}
   <div class="field"><label for="ec-how">How to pay / get a code (shown on the lock screen to logged-in students)</label><textarea id="ec-how" rows="4" maxlength="600" placeholder="e.g. Pay £3 at [your payment link], then WhatsApp your payment reference to the organiser and you'll get a code."></textarea></div>
   <div id="ec-msg"></div><button class="btn primary" type="submit">Save settings</button></form></div>
+  <div class="card" style="margin-bottom:1rem"><h2>Prices by country</h2><p class="hint">Students see the price for the country on their account. Countries are 2-letter codes (IN, PK, US…); the <b>OTHER</b> row is everyone else. "How to pay" overrides the general text above for that region, e.g. your UPI ID for India.</p>
+  <div class="tbl"><table id="pr-table"><tr><th>Region</th><th>Countries</th><th>Currency</th><th>Amount</th><th>Shown as</th><th>How to pay (optional)</th></tr>${(c.regions || []).map((r, i) => `<tr data-pr="${i}" data-id="${esc(r.id)}"><td><input class="pr-in" data-k="name" value="${esc(r.name)}" maxlength="40" aria-label="Region name"></td><td><input class="pr-in" data-k="countries" value="${esc((r.countries || []).join(", "))}" ${r.id === "OTHER" ? 'disabled placeholder="everyone else"' : ""} aria-label="Country codes"></td><td><input class="pr-in sm" data-k="cur" value="${esc(r.cur)}" maxlength="3" aria-label="Currency"></td><td><input class="pr-in sm" data-k="amount" type="number" min="0" step="0.01" value="${r.amount}" aria-label="Amount"></td><td><input class="pr-in sm" data-k="label" value="${esc(r.label)}" maxlength="16" aria-label="Price shown"></td><td><textarea class="pr-in" data-k="how" rows="2" maxlength="600" aria-label="How to pay">${esc(r.how || "")}</textarea></td></tr>`).join("")}</table></div>
+  <div id="pr-msg"></div><button class="btn primary" id="pr-save">Save prices</button></div>
   <div class="card" style="margin-bottom:1rem"><h2>Create a coupon code</h2><form id="f-cp" novalidate><div class="cp-grid">
   ${field("cp-code","Code (leave blank to generate)","text",'maxlength="24" placeholder="e.g. WELCOME" autocapitalize="characters"')}
   ${field("cp-uses","How many students can use it","number",'min="1" max="1000" value="1"')}
@@ -2305,6 +2382,12 @@ async function adminExam() {
   ${field("cp-note","Note (only you see it)","text",'maxlength="80" placeholder="e.g. Paid by Rahul, UPI ref 1234"')}</div>
   <div id="cp-msg"></div><button class="btn primary" type="submit">Create code</button></form></div>
   <div class="card"><h2>Codes</h2><div id="cp-list">${list(d.coupons || [])}</div><p class="hint">You can also unlock a student directly with <b>Grant exam</b> in Overview → Students.</p></div>`;
+  if ($("#pr-save")) $("#pr-save").onclick = e => busy(e.target, "Saving…", async () => {
+    const regions = [...document.querySelectorAll("#pr-table tr[data-pr]")].map(tr => { const g = k => tr.querySelector(`[data-k="${k}"]`).value; return { id:tr.dataset.id, name:g("name"), countries:g("countries").split(/[\s,]+/).filter(Boolean), cur:g("cur"), amount:+g("amount"), label:g("label"), how:g("how") }; });
+    const r = await api("adminSetPrices", { key, regions });
+    $("#pr-msg").innerHTML = r.ok ? `<div class="feedback ok">Prices saved. Students see them within a few minutes.</div>` : `<div class="feedback no">${esc(errMsg(r.error))}</div>`;
+    if (r.ok) { CONFIG = { ...(CONFIG || {}), exam:r.exam }; _rawSet("idta-config", CONFIG); }
+  });
   $("#ec-price").value = c.price || "£3"; $("#ec-how").value = c.how || ""; $("#cp-value").value = priceNum(c.price || "£3");
   $("#f-excfg").onsubmit = async e => { e.preventDefault(); await busy(e.target.querySelector("button[type=submit]"), "Saving…", async () => {
     const r = await api("adminSetExamConfig", { key, lock:$("#ec-lock").checked, price:$("#ec-price").value.trim(), how:$("#ec-how").value });
@@ -2480,7 +2563,7 @@ async function authBoot() {
   if (!AUTH.get()) { if (location.hash === "#admin") { lock(false); return; } authMode = "login"; authRender(); lock(true); return; }
   lock(false);
   const r = await api("me", { token:AUTH.token() }, { retries:1 });
-  if (r.ok) { const was = examLocked(); AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); if (MK.state === "intro" && examLocked() !== was) mockRender(); }
+  if (r.ok) { const was = examLocked(); AUTH.set({ ...AUTH.get(), profile:r.profile }); acctBadge(); editionHint(); applyProgress(mergeProgress(getProgress(), r.progress)); saveProgress(); flush(); loadPack(); if (MK.state === "intro" && examLocked() !== was) mockRender(); }
   else if (r.error === "auth") sessionExpired();
   // network errors: keep working offline with the saved login; queued activity is sent later
 }
@@ -2492,10 +2575,10 @@ function certRender(){
   const root=$("#cert-root"),c=CERT.data;
   if(!c){root.innerHTML=`<p class="hint">Loading certificate…</p>`;return}
   if(c.error){root.innerHTML=`<div class="card"><h1>Certificate not found</h1><p>Check the link. Certificate IDs look like <code>C1A2B3C4D5</code>.</p></div>`;return}
-  const url=SHARE_URL+"#cert="+c.id,date=new Date(c.issued).toLocaleDateString([], {day:"numeric",month:"long",year:"numeric"});
+  const url=(c.site&&SITE_URL[c.site]&&c.site!==EDITION?SITE_URL[c.site]:SHARE_URL)+"#cert="+c.id,date=new Date(c.issued).toLocaleDateString([], {day:"numeric",month:"long",year:"numeric"});
   root.innerHTML=`<div class="cert-actions"><button class="btn primary" id="ct-print">Print or save as PDF</button><button class="btn" id="ct-copy">Copy verification link</button>${signedIn()?`<button class="btn" id="ct-back">Back to Progress</button>`:""}</div>
   <div class="cert" id="cert-doc"><div class="cert-in">
-    <div class="cert-brand"><span class="cert-mark" aria-hidden="true">◆</span> IDTA Revision · AI &amp; Machine Learning</div>
+    <div class="cert-brand"><span class="cert-mark" aria-hidden="true">◆</span> ${esc(BRANDS[c.site] || BRAND)} · AI &amp; Machine Learning</div>
     <div class="cert-kicker">Certificate of achievement</div>
     <p class="cert-small">This certifies that</p><div class="cert-name">${esc(c.name)}</div>
     <p class="cert-small">passed the timed course exam</p><div class="cert-exam">${esc(c.exam)}</div>
@@ -2503,13 +2586,13 @@ function certRender(){
     <div class="cert-foot"><div><b>${esc(date)}</b><span>Date issued</span></div><div class="cert-seal" aria-hidden="true">✓</div><div><b>${esc(c.id)}</b><span>Certificate ID</span></div></div>
     <p class="cert-verify">Verify: ${esc(url)}</p>
   </div></div>
-  <p class="hint cert-note">Issued by IDTA Revision, an unofficial, student-made study tool. It records a practice exam result and is not a university qualification.</p>`;
+  <p class="hint cert-note">Issued by ${esc(BRANDS[c.site] || BRAND)}, an unofficial, student-made study tool. It records a practice exam result and is not a university qualification.</p>`;
   $("#ct-print").onclick=()=>{document.body.classList.add("printcert");setTimeout(()=>{window.print();setTimeout(()=>document.body.classList.remove("printcert"),500)},50)};
   $("#ct-copy").onclick=async()=>{try{await navigator.clipboard.writeText(url);toast("Link copied.")}catch(e){toast(url)}};
   if($("#ct-back"))$("#ct-back").onclick=()=>show("stats");
 }
 async function openCert(id){CERT.data=null;show("cert");const r=await api("cert",{id},{retries:1});CERT.data=r.ok?r.cert:{error:1};certRender()}
-if(SYNC_URL&&location.hash!=="#admin"&&!store.get("idta-admin-key","")){try{if(!sessionStorage.getItem("idta-hit")){sessionStorage.setItem("idta-hit","1");api("hit",{src:window.__src||"",dev:deviceKind(),li:!!AUTH.get(),ret:localStorage.getItem("idta-view")!==null},{retries:0})}}catch(e){}}
+if(SYNC_URL&&location.hash!=="#admin"&&!store.get("idta-admin-key","")){try{if(!sessionStorage.getItem("idta-hit")){sessionStorage.setItem("idta-hit","1");api("hit",{src:window.__src||"",dev:deviceKind(),li:!!AUTH.get(),ret:localStorage.getItem("idta-view")!==null,site:EDITION},{retries:0})}}catch(e){}}
 const CERT_ID=(location.hash.match(/^#cert=([A-Za-z0-9]{10})$/)||[])[1];
 if(CERT_ID&&SYNC_URL&&!AUTH.get()){document.body.classList.add("certmode");lock(false);openCert(CERT_ID)}
 else{authBoot();if(CERT_ID&&SYNC_URL)openCert(CERT_ID)}
@@ -3042,6 +3125,7 @@ const UV = { step:"email", email:"" };
 function uniProfile() { const a = AUTH.get(); return a && a.profile; }
 function packUnis() { return ((CONFIG && CONFIG.unis) || []).filter(u => u.pack); }
 async function loadPack() {
+  if (EDITION === "global") return;
   const p = uniProfile();
   if (!signedIn() || !p || !p.verifiedUni) { const had = !!PACK; PACK = null; try { localStorage.removeItem("idta-pack"); } catch (e) {} if (had) { applyConfig(CONFIG || {}); refreshBankViews(); if (MK.state === "intro") mockRender(); } return; }
   const r = await api("pack", { token:AUTH.token() }, { retries:1 });
@@ -3149,7 +3233,7 @@ function uniPackRender() {
   const sheet=$("#more-sheet"),list=$("#more-list");
   const items=()=>{
     const cur=VIEWS.find(v=>!document.querySelector(`[data-view-panel="${v}"]`).hidden);
-    const views=[["uni","My university"],["must","Must-know checklist"],["cards","Flashcards"],["stats","My progress"]];
+    const views=[...(EDITION==="global"?[["career","Career hub"]]:[["uni","My university"]]),["must","Must-know checklist"],["cards","Flashcards"],["stats","My progress"]];
     if(typeof SYNC_URL!=="undefined"&&SYNC_URL)views.push(["class","Class leaderboard"]);
     if(typeof signedIn==="function"&&signedIn())views.push(["refer","Refer & earn £1"],["account","My account"]);
     if(store.get("idta-admin-key",""))views.push(["admin","Admin"]);

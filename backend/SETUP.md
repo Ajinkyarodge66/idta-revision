@@ -51,6 +51,16 @@ Photos are taken at the start, every 5 minutes, when the student comes back from
 
 Photos older than `PHOTO_DAYS` (30) are deleted automatically a few times a day. You can also run `cleanPhotos` from the editor. Deleting an account deletes that student's photos.
 
+## Two websites, one backend: IDTA Revision and JobReady AI
+
+Both websites use this same script and Google Sheet, so accounts, progress, payments and Admin are shared.
+- **IDTA Revision** (`/idta-revision/`): the UK edition, with University of Portsmouth packs.
+- **JobReady AI** (`/jobready-ai/`): the international edition, with no university packs, its own branding, and a **Career hub** (12-week roadmap, 5 portfolio projects, 35 interview answers, cheat sheets).
+
+Students choose their **country** at sign-up, which also sets the phone code. Someone outside the UK who signs up on IDTA Revision is taken straight to JobReady AI, already logged in. Existing students see a banner suggesting the other edition, unless they're verified for a university pack.
+
+**Prices by country** (Admin → Exam & coupons): each region has a currency, an amount, the label students see (e.g. ₹199) and optional "how to pay" text, for example your UPI ID for India. Defaults: UK £3 · India ₹199 · Pakistan Rs 499 · Bangladesh ৳249 · Nigeria ₦1,500 · UAE AED 12 · USA/Canada $3.99 · Europe €3.49 · everyone else $2.99. Payments are recorded in their own currency. Sales totals are converted to pounds at approximate rates (`TO_GBP` in `Code.gs`). Analytics can be filtered by website and shows sign-ups by country.
+
 ## Analytics and student tracker
 
 **Admin → Analytics** shows, for the last 7, 30 or 90 days or 12 months:
@@ -76,7 +86,7 @@ Don't use "New deployment" for updates: it creates a new URL, and the app would 
 
 | Sheet | Contents |
 |---|---|
-| **Users** | ID, created, name, mobile, email, university, course, password hash + salt (never the password), leaderboard choice, saved progress, last login, reset code hash, consent time, university email, verified university, verification code hash, exam access (how it was unlocked), when they first started a course exam (ends the refund window), who referred them, sign-up source and device |
+| **Users** | ID, created, name, mobile, email, university, course, password hash + salt (never the password), leaderboard choice, saved progress, last login, reset code hash, consent time, university email, verified university, verification code hash, exam access (how it was unlocked), when they first started a course exam (ends the refund window), who referred them, sign-up source and device, which website they signed up on, country |
 | **Sessions** | Login tokens, stored only as hashes, with a 30-day expiry |
 | **Events** | One row per answer, mock or Calc Lab attempt, plus `unlock`/`revoke` rows for exam access (with the amount) |
 | **Announcements** | Banners you post from the admin page (title, message, style, expiry) |

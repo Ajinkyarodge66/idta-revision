@@ -1,6 +1,6 @@
 // Offline support. Pages: network first (always the latest version), cached copy only when offline.
 // Images, icons and fonts: cached copy first, refreshed in the background.
-const CACHE = 'idta-v18';
+const CACHE = 'idta-v19';
 const FILES = ['./', './index.html', './privacy.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './assets/shot-practice.png', './assets/shot-mock.png', './assets/shot-lab.png', './assets/shot-progress.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))));
