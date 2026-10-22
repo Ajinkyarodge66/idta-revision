@@ -8,7 +8,7 @@ import threading
 
 _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/t.db"
-os.environ.update(ADMIN_KEY="k-test", MAIL_MODE="test", FILES_DIR=f"{_tmp}/files", NOTIFY_EMAIL="owner@example.com")
+os.environ.update(ROLLUP_LAG_MS="0", ADMIN_KEY="k-test", MAIL_MODE="test", FILES_DIR=f"{_tmp}/files", NOTIFY_EMAIL="owner@example.com")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

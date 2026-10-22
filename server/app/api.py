@@ -9,12 +9,12 @@ import math
 import re
 import secrets
 
-from sqlalchemy import and_, case, delete, distinct, func, insert, or_, select, update
+from sqlalchemy import and_, case, delete, distinct, func, insert, or_, select, true, update
 from sqlalchemy.exc import IntegrityError
 
 from . import settings
-from .db import (capstones, certs, coupons, events, news, payments, payouts, proctor, questions, refunds,
-                 sessions, settings_t, users, visits)
+from .db import (capstones, certs, coupons, day_activity, events, news, payments, payouts, proctor, question_stats, questions, refunds,
+                 sessions, settings_t, topic_stats, user_stats, users, visits)
 from .services import LocalCounter, bump, cache, forget, store, too_many
 from .util import (b64ok, country, coupon_code, day_key, dev, email, iso, js_num, js_str, mobile, money,
                    multiline, now_ms, num_or_none, out_num, parse_ms, pid, plain, pw, ref_code, ref_norm, sha,
@@ -262,11 +262,11 @@ def six_digit_code():
 
 
 def sale(c, uid, name, amount, how, cur="GBP"):
-    c.execute(insert(events).values(ts=now_ms(), uid=uid, name=text(name, 40), ev="unlock", s=amount, cur=cur or "GBP", k=text(how, 60)))
+    c.execute(insert(events).values(ts=now_ms(), ins=now_ms(), uid=uid, name=text(name, 40), ev="unlock", s=amount, cur=cur or "GBP", k=text(how, 60)))
 
 
 def money_event(c, uid, name, ev, amount, cur, detail):
-    c.execute(insert(events).values(ts=now_ms(), uid=uid, name=text(name, 40), ev=ev, s=amount, cur=cur or None, k=text(detail, 60)))
+    c.execute(insert(events).values(ts=now_ms(), ins=now_ms(), uid=uid, name=text(name, 40), ev=ev, s=amount, cur=cur or None, k=text(detail, 60)))
 
 
 def admin_ok(ctx, b):
@@ -323,14 +323,14 @@ def signup(ctx, b):
     row = dict(id=uid, created=iso(), name=name, mobile=mob, email=mail, uni=uni, course=course, hash=hash_pw(c, p, salt), salt=salt,
                lb=b.get("lb") is not False, prog="", prog_at="", last=iso(), consent=iso(), ref_by=ref_by, ref_code=ref_code(uid),
                src=src(b.get("src")) or ("referral" if ref_by else "direct"), dev=dev(b.get("dev")), site=site(b.get("site")),
-               country=country(b.get("country")), uni_email="", vuni="", vcode="", vexp="", exam="", exam_used="", rcode="", rexp="")
+               country=country(b.get("country")), cday=now_ms() // DAY, uni_email="", vuni="", vcode="", vexp="", exam="", exam_used="", rcode="", rexp="")
     try:
         with c.begin_nested():
             c.execute(insert(users).values(**row))
     except IntegrityError:
         return fail("mobile_taken") if user_by(c, users.c.mobile, mob) else fail("email_taken")
     bump(c, ipk, 3600)
-    cache.remove("leaderboard")
+    cache.remove("leaderboard:")
     return {"ok": True, "token": new_session(c, uid), "profile": profile(row), "progress": None}
 
 
@@ -390,7 +390,8 @@ def events_(ctx, b):
     if not m: return fail("auth")
     lst = [e for e in (b.get("events") or [])[:300] if isinstance(e, dict) and e.get("t") in ACTIVITY] if isinstance(b.get("events"), list) else []
     if not lst: return {"ok": True, "saved": 0}
-    rows = [dict(ts=_event_ts(e.get("ts")), uid=m["id"], name=m["name"], ev=e["t"], topic=text(e.get("topic"), 20) or None,
+    ins = now_ms()
+    rows = [dict(ts=_event_ts(e.get("ts")), ins=ins, uid=m["id"], name=m["name"], ev=e["t"], topic=text(e.get("topic"), 20) or None,
                  qid=num_or_none(e.get("id")), ok=1 if e.get("ok") is True else 0 if e.get("ok") is False else None,
                  s=num_or_none(e.get("s")), n=num_or_none(e.get("n")), k=text(e.get("k"), 30) or None) for e in lst]
     ctx.c.execute(insert(events), rows)
@@ -408,7 +409,7 @@ def updateProfile(ctx, b):
     vals = dict(name=name, uni=uni, course=course, lb=b.get("lb") is not False)
     if country(b.get("country")): vals["country"] = country(b.get("country"))
     set_user(ctx.c, m["id"], **vals)
-    cache.remove("leaderboard")
+    cache.remove("leaderboard:")
     return {"ok": True, "profile": profile({**m, **vals})}
 
 
@@ -475,8 +476,10 @@ def deleteAccount(ctx, b):
         store().delete(r.file)
     c.execute(delete(proctor).where(proctor.c.uid == uid))
     c.execute(delete(events).where(events.c.uid == uid))
+    c.execute(delete(user_stats).where(user_stats.c.uid == uid))
+    c.execute(delete(day_activity).where(day_activity.c.uid == uid))
     c.execute(delete(users).where(users.c.id == uid))
-    cache.remove("leaderboard")
+    cache.remove("leaderboard:")
     return {"ok": True}
 
 
@@ -654,7 +657,7 @@ def verifyConfirm(ctx, b):
     uni = domains(c).get((m["uni_email"] or "").split("@")[-1])
     if not uni: return fail("unknown_domain")
     set_user(c, m["id"], vuni=uni, vcode="", vexp="")
-    cache.remove("leaderboard")
+    cache.remove("leaderboard:")
     return {"ok": True, "profile": profile({**m, "vuni": uni})}
 
 
@@ -690,7 +693,7 @@ def adminSetAccess(ctx, b):
     vals = {"vuni": uni}
     if not uni: vals.update(vcode="", vexp="")
     set_user(c, r["id"], **vals)
-    cache.remove("leaderboard")
+    cache.remove("leaderboard:")
     return {"ok": True, "id": r["id"], "verifiedUni": uni}
 
 
@@ -823,7 +826,7 @@ def adminSetExamConfig(ctx, b):
 def adminSales(ctx, b):
     c = ctx.c
     rows = c.execute(select(events.c.ts, events.c.uid, events.c.name, events.c.ev, events.c.s, events.c.cur, events.c.k)
-                     .where(events.c.ev.in_(MONEY_EVENTS)).order_by(events.c.seq)).all()
+                     .where(events.c.ev.in_(MONEY_EVENTS)).order_by(events.c.seq.desc()).limit(20000)).all()[::-1]
     accounts = c.execute(select(func.count()).select_from(users)).scalar()
     unlocked = c.execute(select(func.count()).select_from(users).where(users.c.exam != "")).scalar()
     sales = []
@@ -1150,7 +1153,8 @@ def referralPayout(ctx, b):
 def adminReferrals(ctx, b):
     c = ctx.c
     names = {r.id: r.name for r in c.execute(select(users.c.id, users.c.name))}
-    refs = [r.ref_by for r in c.execute(select(users.c.ref_by).where(users.c.ref_by != "").distinct())]
+    refs = [r[0] for r in c.execute(select(users.c.ref_by, func.count().label("n")).where(users.c.ref_by != "").group_by(users.c.ref_by)
+                                     .order_by(func.count().desc()).limit(200))]
     top = []
     for uid in refs:
         r = referrals_of(c, uid)
@@ -1193,100 +1197,84 @@ def hit(ctx, b):
 
 @admin
 def adminAnalytics(ctx, b):
+    """Funnel, sources, engagement and retention, computed with SQL aggregates and the daily-activity summary,
+    so it stays fast with millions of answers."""
     c = ctx.c
     days = int(js_num(b.get("days")) or 30)
     days = days if days in (7, 30, 90, 365) else 30
     now = now_ms()
-    frm = now - days * DAY
+    frm, today = now - days * DAY, now // DAY
+    frm_iso, frm_day = iso(frm), frm // DAY
     keys = [day_key(now - i * DAY) for i in range(min(days, 90) - 1, -1, -1)]
+    first_key_day = (now - (len(keys) - 1) * DAY) // DAY
     want = b.get("site") if b.get("site") in ("uk", "global") else ""
-    vq = select(visits.c.ts, visits.c.src, visits.c.dev, visits.c.li)
-    if want:
-        vq = vq.where(visits.c.site == want) if want == "global" else vq.where(or_(visits.c.site != "global", visits.c.site.is_(None)))
-    vis = [{"t": r.ts, "src": r.src or "direct", "dev": r.dev or "", "li": bool(r.li)} for r in c.execute(vq)]
-    uq = select(users.c.id, users.c.created, users.c.src, users.c.dev, users.c.ref_by, users.c.country, users.c.site)
-    us = []
-    for r in c.execute(uq):
-        if want and site(r.site) != want:
-            continue
-        us.append({"id": r.id, "t": parse_ms(r.created) or 0, "src": r.src or "unknown", "dev": r.dev or "unknown", "country": r.country or ""})
-    in_site = {u["id"] for u in us}
-    act, unlock_at, revenue, mockers = {}, {}, {}, {}
-    for r in c.execute(select(events.c.ts, events.c.uid, events.c.ev, events.c.s, events.c.cur)
-                       .where(events.c.ev.in_(ACTIVITY + ("unlock",))).order_by(events.c.seq)):
-        if r.uid not in in_site:
-            continue
-        if r.ev in ACTIVITY:
-            act.setdefault(r.uid, []).append(r.ts)
-        if r.ev == "mock":
-            mockers[r.uid] = min(mockers.get(r.uid, float("inf")), r.ts)
-        if r.ev == "unlock":
-            unlock_at.setdefault(r.uid, r.ts)
-            revenue[r.uid] = revenue.get(r.uid, 0) + (r.s or 0) * TO_GBP.get(r.cur or "GBP", 0)
-    cert_uids = {r.uid for r in c.execute(select(certs.c.uid))}
-    v_in = [v for v in vis if v["t"] >= frm and not v["li"]]
-    u_in = [u for u in us if u["t"] >= frm]
-    funnel = {"visits": len(v_in), "signups": len(u_in), "studied": len([u for u in u_in if u["id"] in act]),
-              "unlocked": len([u for u in u_in if u["id"] in unlock_at]), "exams": len([u for u in u_in if u["id"] in mockers]),
-              "certs": len([u for u in u_in if u["id"] in cert_uids])}
+    U, V, E, D, S_ = users.c, visits.c, events.c, day_activity.c, user_stats.c
+
+    def on_site(col):
+        if want == "global":
+            return col == "global"
+        if want == "uk":
+            return or_(col != "global", col.is_(None))
+        return true()
+
+    usite, vsite = on_site(U.site), on_site(V.site)
+    site_uids = select(U.id).where(usite)
+    cnt = lambda q: c.execute(q).scalar() or 0
+    new_u = and_(U.created >= frm_iso, usite)
+    unlocked_ids = select(E.uid).where(E.ev == "unlock")
+    mock_ids = select(E.uid).where(E.ev == "mock")
+    funnel = {"visits": cnt(select(func.count()).where(V.ts >= frm, V.li.is_not(True), vsite)),
+              "signups": cnt(select(func.count()).where(new_u)),
+              "studied": cnt(select(func.count()).where(new_u, U.id.in_(select(D.uid)))),
+              "unlocked": cnt(select(func.count()).where(new_u, U.id.in_(unlocked_ids))),
+              "exams": cnt(select(func.count()).where(new_u, U.id.in_(mock_ids))),
+              "certs": cnt(select(func.count()).where(new_u, U.id.in_(select(certs.c.uid))))}
     dv, ds, da, du = ({k: 0 for k in keys} for _ in range(4))
-    for v in v_in:
-        k = day_key(v["t"])
-        if k in dv: dv[k] += 1
-    for u in u_in:
-        k = day_key(u["t"])
-        if k in ds: ds[k] += 1
-    seen = set()
-    for uid, ts in act.items():
-        for t in ts:
-            k = day_key(t)
-            if k in da and (uid, k) not in seen:
-                seen.add((uid, k)); da[k] += 1
-    for uid, t in unlock_at.items():
-        k = day_key(t)
+    for r in c.execute(select((V.ts // DAY).label("d"), func.count()).where(V.ts >= frm, V.li.is_not(True), vsite).group_by("d")):
+        k = day_key(int(r[0]) * DAY)
+        if k in dv: dv[k] = r[1]
+    for r in c.execute(select(func.substr(U.created, 1, 10).label("d"), func.count()).where(new_u).group_by("d")):
+        if r[0] in ds: ds[r[0]] = r[1]
+    for r in c.execute(select(D.day, func.count()).where(D.day >= first_key_day, D.uid.in_(site_uids)).group_by(D.day)):
+        k = day_key(int(r[0]) * DAY)
+        if k in da: da[k] = r[1]
+    first_unlock = select(E.uid, func.min(E.ts).label("first_ts")).where(E.ev == "unlock").group_by(E.uid).subquery()
+    for r in c.execute(select(first_unlock.c.first_ts).where(first_unlock.c.first_ts >= frm, first_unlock.c.uid.in_(site_uids))):
+        k = day_key(r[0])
         if k in du: du[k] += 1
     srcs = {}
-    S = lambda k: srcs.setdefault(k, {"visits": 0, "signups": 0, "unlocked": 0, "revenue": 0})
-    for v in v_in: S(v["src"])["visits"] += 1
-    for u in u_in:
-        o = S(u["src"]); o["signups"] += 1
-        if u["id"] in unlock_at: o["unlocked"] += 1
-        o["revenue"] += revenue.get(u["id"], 0)
-
-    def active_since(since):
-        return len([1 for ts in act.values() if any(t >= since for t in ts)])
-
-    def minutes(uid):
-        ts = sorted(t for t in act[uid] if t >= frm)
-        m = 0
-        for i, t in enumerate(ts):
-            m += min(5, (t - ts[i - 1]) / 6e4) if i and t - ts[i - 1] < 30 * 6e4 else 1
-        return m
-
-    active_in = [uid for uid, ts in act.items() if any(t >= frm for t in ts)]
-    days_of = lambda uid: len({day_key(t) for t in act[uid] if t >= frm})
-    engagement = {"dau": active_since(now - DAY), "wau": active_since(now - 7 * DAY), "mau": active_since(now - 30 * DAY), "active": len(active_in),
-                  "avgDays": round(sum(days_of(u) for u in active_in) / len(active_in) * 10) / 10 if active_in else 0,
-                  "avgMinutes": round(sum(minutes(u) for u in active_in) / len(active_in)) if active_in else 0}
-    devices = {"visits": {}, "signups": {}}
-    for v in v_in:
-        devices["visits"][v["dev"] or "unknown"] = devices["visits"].get(v["dev"] or "unknown", 0) + 1
-    for u in u_in:
-        devices["signups"][u["dev"]] = devices["signups"].get(u["dev"], 0) + 1
+    Sx = lambda k: srcs.setdefault(k or "direct", {"visits": 0, "signups": 0, "unlocked": 0, "revenue": 0})
+    for r in c.execute(select(V.src, func.count()).where(V.ts >= frm, V.li.is_not(True), vsite).group_by(V.src)):
+        Sx(r[0] or "direct")["visits"] += r[1]
+    for r in c.execute(select(U.src, func.count(), func.sum(case((U.id.in_(unlocked_ids), 1), else_=0))).where(new_u).group_by(U.src)):
+        o = Sx(r[0] or "unknown"); o["signups"] += r[1]; o["unlocked"] += int(r[2] or 0)
+    for r in c.execute(select(U.src, E.cur, func.sum(E.s)).join(users, users.c.id == E.uid).where(E.ev == "unlock", new_u).group_by(U.src, E.cur)):
+        Sx(r[0] or "unknown")["revenue"] += (r[2] or 0) * TO_GBP.get(r[1] or "GBP", 0)
+    in_site = S_.uid.in_(site_uids)
+    since = lambda t: cnt(select(func.count()).where(S_.last >= t, in_site))
+    active = cnt(select(func.count(distinct(D.uid))).where(D.day >= frm_day, D.uid.in_(site_uids)))
+    day_rows = cnt(select(func.count()).where(D.day >= frm_day, D.uid.in_(site_uids)))
+    mfrm = max(frm, now - 30 * DAY)          # study minutes: one-minute slots with activity (last 30 days at most)
+    slots = select(E.uid, (E.ts // 60000).label("m")).where(E.ts >= mfrm, E.ev.in_(ACTIVITY), E.uid.in_(site_uids)).distinct().subquery()
+    mins = cnt(select(func.count()).select_from(slots))
+    m_active = cnt(select(func.count(distinct(D.uid))).where(D.day >= mfrm // DAY, D.uid.in_(site_uids)))
+    engagement = {"dau": since(now - DAY), "wau": since(now - 7 * DAY), "mau": since(now - 30 * DAY), "active": active,
+                  "avgDays": round(day_rows / active * 10) / 10 if active else 0, "avgMinutes": round(mins / m_active) if m_active else 0}
+    devices = {"visits": {r[0] or "unknown": r[1] for r in c.execute(select(V.dev, func.count()).where(V.ts >= frm, V.li.is_not(True), vsite).group_by(V.dev))},
+               "signups": {r[0] or "unknown": r[1] for r in c.execute(select(U.dev, func.count()).where(new_u).group_by(U.dev))}}
 
     def ret(n):
-        pool = [u for u in us if u["t"] <= now - n * DAY]
-        back = [u for u in pool if any(t >= u["t"] + n * DAY for t in act.get(u["id"], []))]
-        return {"pool": len(pool), "back": len(back)}
+        pool = and_(U.cday.is_not(None), U.cday <= today - n, usite)
+        back = select(D.uid).where(D.uid == U.id, D.day >= U.cday + n).exists()
+        return {"pool": cnt(select(func.count()).where(pool)), "back": cnt(select(func.count()).where(pool, back))}
 
-    ctr = {}
-    for u in u_in:
-        ctr[u["country"] or "??"] = ctr.get(u["country"] or "??", 0) + 1
+    countries = [[r[0] or "??", r[1]] for r in c.execute(select(U.country, func.count().label("n")).where(new_u).group_by(U.country).order_by(func.count().desc()).limit(15))]
     return {"ok": True, "days": days, "keys": keys, "funnel": funnel,
             "daily": {"visits": [dv[k] for k in keys], "signups": [ds[k] for k in keys], "active": [da[k] for k in keys], "unlocks": [du[k] for k in keys]},
             "sources": sorted([{"src": k, **v} for k, v in srcs.items()], key=lambda x: (-x["signups"], -x["visits"])),
             "engagement": engagement, "devices": devices, "retention": {"d1": ret(1), "d7": ret(7), "d30": ret(30)},
-            "totals": {"users": len(us), "visits": len(vis)}, "countries": sorted(ctr.items(), key=lambda x: -x[1])[:15]}
+            "totals": {"users": cnt(select(func.count()).where(usite)), "visits": cnt(select(func.count()).where(vsite))},
+            "countries": countries}
 
 
 def ev_out(x):
@@ -1451,69 +1439,124 @@ def blank():
     return {"last": 0, "q": 0, "qr": 0, "mocks": 0, "best": None, "lastMock": "", "lab": 0, "labr": 0, "today": 0}
 
 
-def stats(c, recent=True):
-    """Per-student, per-topic and per-question totals, computed in the database."""
-    day_ago = now_ms() - DAY
-    E = events.c
-    is_ = lambda cond: func.sum(case((cond, 1), else_=0))
-    us = {}
-    q = select(E.uid, func.max(E.ts), is_(E.ts > day_ago), is_(E.ev == "q"), is_(and_(E.ev == "q", E.ok == 1)),
-               is_(E.ev == "mock"), is_(E.ev == "lab"), is_(and_(E.ev == "lab", E.ok == 1))).group_by(E.uid)
-    for r in c.execute(q):
-        u = blank()
-        u.update(last=r[1] or 0, today=int(r[2] or 0), q=int(r[3] or 0), qr=int(r[4] or 0), mocks=int(r[5] or 0), lab=int(r[6] or 0), labr=int(r[7] or 0))
-        us[r[0]] = u
-    for r in c.execute(select(E.uid, func.max(E.s)).where(and_(E.ev == "mock", E.n == 30)).group_by(E.uid)):
-        if r[0] in us and r[1] is not None:
-            us[r[0]]["best"] = out_num(r[1])
-    last_seq = select(E.uid, func.max(E.seq).label("m")).where(E.ev == "mock").group_by(E.uid).subquery()
-    for r in c.execute(select(E.uid, E.s, E.n).join(last_seq, E.seq == last_seq.c.m)):
-        if r.uid in us:
-            us[r.uid]["lastMock"] = js_str(out_num(r.s)) + "/" + js_str(out_num(r.n))
-    topics = {r[0]: [int(r[1] or 0), int(r[2])] for r in c.execute(
-        select(E.topic, is_(E.ok == 1), func.count()).where(and_(E.ev == "q", E.topic.is_not(None), E.topic != "")).group_by(E.topic))}
-    out = {"users": us, "topics": topics}
-    if recent:
-        out["questions"] = {js_str(out_num(r[0])): [int(r[1] or 0), int(r[2])] for r in c.execute(
-            select(E.qid, is_(E.ok == 1), func.count()).where(and_(E.ev == "q", E.qid.is_not(None))).group_by(E.qid))}
-        out["rows"] = c.execute(select(func.count()).select_from(events)).scalar()
-        rec = c.execute(select(events).order_by(E.seq.desc()).limit(200)).all()
-        out["recent"] = [{"ts": x.ts, "name": x.name, "ev": x.ev, "topic": x.topic or "", "qid": out_num(x.qid), "ok": out_num(x.ok), "s": out_num(x.s),
-                          "n": out_num(x.n if x.n is not None else x.cur), "k": x.k or ""} for x in rec]
-    return out
+def stat_row(r):
+    """Per-student totals from the user_stats summary (None when the student hasn't done anything yet)."""
+    if r is None or r.get("uid") is None:
+        return blank()
+    q = int(r["q"] or 0)
+    return {"last": r["last"] or 0, "q": q, "qr": int(r["qr"] or 0), "mocks": int(r["mocks"] or 0), "best": out_num(r["best"]),
+            "lastMock": r["last_mock"] or "", "lab": int(r["lab"] or 0), "labr": int(r["labr"] or 0), "today": 0}
+
+
+def topic_totals(c):
+    return {r.topic: [int(r.correct), int(r.total)] for r in c.execute(select(topic_stats))}
+
+
+def event_rows(c):
+    """Exact count for small tables, the planner's estimate once there are millions."""
+    if c.dialect.name == "postgresql":
+        est = c.exec_driver_sql("SELECT reltuples::bigint FROM pg_class WHERE relname = 'events'").scalar() or 0
+        if est > 500_000:
+            return int(est)
+    return c.execute(select(func.count()).select_from(events)).scalar()
+
+
+LB_LIMIT = 300
 
 
 @action
 def leaderboard(ctx, b):
-    hit_ = cache.get("leaderboard")
-    if hit_:
-        return hit_
+    """Top students (best full mock, then accuracy, then answers). Optionally for one university, plus your own row."""
     c = ctx.c
-    s = stats(c, recent=False)
-    rows, n = [], 0
-    for r in c.execute(select(users.c.id, users.c.name, users.c.course, users.c.vuni, users.c.uni, users.c.lb).order_by(users.c.seq)):
-        n += 1
-        if not r.lb:
-            continue
-        st = s["users"].get(r.id) or blank()
-        rows.append({"pid": pid(r.id), "name": r.name, "course": r.course, "university": r.vuni or r.uni or "", "verified": bool(r.vuni),
-                     "best": st["best"], "mocks": st["mocks"], "q": st["q"], "acc": round(st["qr"] / st["q"] * 100) if st["q"] else None})
-    out = {"ok": True, "players": n, "topics": s["topics"], "leaderboard": rows}
-    cache.put("leaderboard", out, 60)
+    uni = text(b.get("uni"), 100)
+    key = "leaderboard:" + uni
+    out = cache.get(key)
+    if not out:
+        S_ = user_stats.c
+        acc = case((S_.q > 0, S_.qr * 1.0 / S_.q), else_=None)
+        q = (select(users.c.id, users.c.name, users.c.course, users.c.vuni, users.c.uni, user_stats).select_from(users.outerjoin(user_stats, S_.uid == users.c.id))
+             .where(users.c.lb.is_(True)).order_by(S_.best.desc().nulls_last(), acc.desc().nulls_last(), func.coalesce(S_.q, 0).desc(), users.c.seq).limit(LB_LIMIT))
+        if uni:
+            q = q.where(or_(users.c.vuni == uni, users.c.uni == uni))
+        rows = []
+        for r in c.execute(q).mappings():
+            st = stat_row(r)
+            rows.append({"pid": pid(r["id"]), "name": r["name"], "course": r["course"], "university": r["vuni"] or r["uni"] or "", "verified": bool(r["vuni"]),
+                         "best": st["best"], "mocks": st["mocks"], "q": st["q"], "acc": round(st["qr"] / st["q"] * 100) if st["q"] else None})
+        out = {"ok": True, "players": c.execute(select(func.count()).select_from(users)).scalar(),
+               "onBoard": c.execute(select(func.count()).select_from(users).where(users.c.lb.is_(True))).scalar(),
+               "topics": topic_totals(c), "leaderboard": rows, "limit": LB_LIMIT}
+        cache.put(key, out, 60)
+    uid = auth(c, b.get("token")) if b.get("token") else None
+    if uid and not any(r["pid"] == pid(uid) for r in out["leaderboard"]):
+        r = c.execute(select(users.c.id, users.c.name, users.c.course, users.c.vuni, users.c.uni, users.c.lb, user_stats)
+                      .select_from(users.outerjoin(user_stats, user_stats.c.uid == users.c.id)).where(users.c.id == uid)).mappings().first()
+        if r and r["lb"]:
+            st = stat_row(r)
+            return {**out, "me": {"pid": pid(uid), "name": r["name"], "course": r["course"], "university": r["vuni"] or r["uni"] or "", "verified": bool(r["vuni"]),
+                                  "best": st["best"], "mocks": st["mocks"], "q": st["q"], "acc": round(st["qr"] / st["q"] * 100) if st["q"] else None}}
+    return out
+
+
+ADMIN_LIST = 1000
+
+
+def admin_users(c, where=None, order=None, limit=ADMIN_LIST, offset=0):
+    q = select(users, user_stats.c.uid, user_stats.c.last.label("s_last"), user_stats.c.q, user_stats.c.qr, user_stats.c.mocks, user_stats.c.best,
+               user_stats.c.last_mock, user_stats.c.lab, user_stats.c.labr).select_from(users.outerjoin(user_stats, user_stats.c.uid == users.c.id))
+    if where is not None:
+        q = q.where(where)
+    q = q.order_by(*(order or [func.coalesce(user_stats.c.last, 0).desc(), users.c.seq.desc()])).limit(limit).offset(offset)
+    rows = c.execute(q).mappings().all()
+    day_ago = now_ms() - DAY
+    today = {}
+    ids = [r["id"] for r in rows]
+    for i in range(0, len(ids), 500):
+        for r in c.execute(select(events.c.uid, func.count()).where(events.c.uid.in_(ids[i:i + 500]), events.c.ts > day_ago).group_by(events.c.uid)):
+            today[r[0]] = r[1]
+    out = []
+    for r in rows:
+        st = stat_row({**r, "last": r["s_last"]})
+        st["today"] = today.get(r["id"], 0)
+        out.append({"id": r["id"], "name": r["name"], "mobile": r["mobile"], "email": r["email"], "university": r["uni"], "course": r["course"],
+                    "lb": bool(r["lb"]), "created": r["created"], "lastLogin": r["last"] or "", "uniEmail": r["uni_email"] or "",
+                    "verifiedUni": r["vuni"] or "", "examAccess": r["exam"] or "", "site": site(r["site"]), "country": r["country"] or "", **st})
     return out
 
 
 @admin
 def admin_(ctx, b):
+    """Admin overview. Lists the most recently active students (or search results) with class-wide totals."""
     c = ctx.c
-    s = stats(c)
-    us = []
-    for r in c.execute(select(users).order_by(users.c.seq)).mappings():
-        us.append({"id": r["id"], "name": r["name"], "mobile": r["mobile"], "email": r["email"], "university": r["uni"], "course": r["course"],
-                   "lb": bool(r["lb"]), "created": r["created"], "lastLogin": r["last"] or "", "uniEmail": r["uni_email"] or "",
-                   "verifiedUni": r["vuni"] or "", "examAccess": r["exam"] or "", "site": site(r["site"]), "country": r["country"] or "",
-                   **(s["users"].get(r["id"]) or blank())})
-    return {"ok": True, "rows": s["rows"], "topics": s["topics"], "questions": s["questions"], "recent": s["recent"], "users": us}
+    S_ = user_stats.c
+    qtext = text(b.get("q"), 80).lower()
+    where = None
+    if qtext:
+        like = "%" + qtext.replace("%", "").replace("_", "") + "%"
+        where = or_(*[func.lower(col).like(like) for col in (users.c.name, users.c.mobile, users.c.email, users.c.uni, users.c.course, users.c.vuni)])
+    us = admin_users(c, where, limit=500 if qtext else ADMIN_LIST)
+    now = now_ms()
+    agg = c.execute(select(func.coalesce(func.sum(S_.q), 0), func.coalesce(func.sum(S_.qr), 0), func.coalesce(func.sum(S_.mocks), 0),
+                           func.sum(case((S_.last > now - DAY, 1), else_=0)), func.sum(case((S_.last > now - 7 * DAY, 1), else_=0)))).first()
+    totals = {"accounts": c.execute(select(func.count()).select_from(users)).scalar(),
+              "onBoard": c.execute(select(func.count()).select_from(users).where(users.c.lb.is_(True))).scalar(),
+              "q": int(agg[0]), "qr": int(agg[1]), "mocks": int(agg[2]), "active24h": int(agg[3] or 0), "active7d": int(agg[4] or 0), "shown": len(us)}
+    courses = [[r[0] or "–", r[1]] for r in c.execute(select(users.c.course, func.count().label("n")).group_by(users.c.course).order_by(func.count().desc()).limit(30))]
+    rec = c.execute(select(events).order_by(events.c.seq.desc()).limit(200)).all()
+    recent = [{"ts": x.ts, "name": x.name, "ev": x.ev, "topic": x.topic or "", "qid": out_num(x.qid), "ok": out_num(x.ok), "s": out_num(x.s),
+               "n": out_num(x.n if x.n is not None else x.cur), "k": x.k or ""} for x in rec]
+    return {"ok": True, "rows": event_rows(c), "topics": topic_totals(c),
+            "questions": {r.qid: [int(r.correct), int(r.total)] for r in c.execute(select(question_stats))},
+            "recent": recent, "users": us, "totals": totals, "courses": courses, "search": qtext}
+
+
+@admin
+def adminUsersPage(ctx, b):
+    """All students, page by page (for the CSV export)."""
+    off = max(0, int(js_num(b.get("offset")) or 0))
+    lim = max(1, min(5000, int(js_num(b.get("limit")) or 2000)))
+    us = admin_users(ctx.c, None, order=[users.c.seq], limit=lim, offset=off)
+    return {"ok": True, "users": us, "next": off + len(us) if len(us) == lim else None}
 
 
 # ---------- housekeeping (runs at most hourly, triggered by traffic) ----------

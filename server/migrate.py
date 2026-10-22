@@ -116,7 +116,8 @@ def main():
             uni_email=s(r[16]) if len(r) > 16 else "", vuni=s(r[17]) if len(r) > 17 else "", vcode=s(r[18]) if len(r) > 18 else "",
             vexp=isos(r[19]) if len(r) > 19 else "", exam=s(r[20]) if len(r) > 20 else "", exam_used=isos(r[21]) if len(r) > 21 else "",
             ref_by=s(r[22]) if len(r) > 22 else "", ref_code=ref_code(s(r[0])), src=s(r[23]) if len(r) > 23 else "", dev=s(r[24]) if len(r) > 24 else "",
-            site=site(s(r[25])) if len(r) > 25 else "uk", country=s(r[26]) if len(r) > 26 else "") for r in U if s(r[0])] or [])
+            site=site(s(r[25])) if len(r) > 25 else "uk", country=s(r[26]) if len(r) > 26 else "",
+            cday=(ms(r[1]) // 86_400_000) if ms(r[1]) is not None else None) for r in U if s(r[0])] or [])
         now = int(time.time() * 1000)
         ses = [dict(token_hash=s(r[0]), uid=s(r[1]), created=isos(r[2]), expires=ms(r[3]) or 0) for r in data["sessions"] if s(r[0]) and (ms(r[3]) or 0) > now]
         if ses:
@@ -182,6 +183,8 @@ def main():
             shots.append(dict(id=s(r[0]), ts=ms(r[1]) or now, time=isos(r[1]), uid=s(r[2]), name=s(r[3]), session=s(r[4]), exam=s(r[5]), reason=s(r[6]), file=fkey))
         put(db.proctor, shots)
 
+    from app import rollup
+    rollup.rebuild()          # running totals for the leaderboard and dashboards
     print("Copied: " + ", ".join(f"{k} {len(v)}" for k, v in data.items()))
     print("Done. Passwords, sessions and purchases carried over; students stay logged in.")
 

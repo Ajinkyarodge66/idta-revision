@@ -68,6 +68,24 @@ gcloud run jobs execute idta-migrate --region $REGION --wait
 
 The old Apps Script stays in place. It sends the emails, and if anything goes wrong you can switch back by rebuilding with its URL.
 
+## Updating the server later
+
+```bash
+cd ~/idta-revision && git pull -q && bash server/clouddeploy.sh
+```
+
+## Built for scale
+
+- **Running totals.** The leaderboard, admin overview and analytics read small summary tables (`user_stats`, `topic_stats`,
+  `question_stats`, `day_activity`), which `app/rollup.py` keeps up to date in the background. They don't scan every answer ever given.
+- **Bounded responses.** The leaderboard returns the top 300, plus your own row. The admin page lists the 1,000 most recently
+  active students and searches the rest on the server. The export downloads everyone page by page.
+- **Automatic scaling.** Cloud Run runs up to 100 server copies of 80 requests each, and Neon's connection pooler shares database connections.
+- **Safety limits.** There's a 25-second limit per query, a flood guard per IP (generous enough for a whole campus on one network),
+  4 MB request size, gzip responses, and retries on brief database hiccups.
+- **What to upgrade as you grow:** Neon storage and compute past roughly 10,000 active students, and email through Brevo or Resend
+  (`MAIL_MODE=smtp`) past 100 emails a day.
+
 ## Running it yourself
 
 ```bash

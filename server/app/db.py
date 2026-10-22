@@ -42,6 +42,7 @@ users = Table("users", md, _seq(),
     Column("dev", String(10), default=""),
     Column("site", String(8), default="uk"),
     Column("country", String(2), default=""),
+    Column("cday", Integer),                           # sign-up day (days since 1970), for retention
 )
 Index("ix_users_ref_by", users.c.ref_by)
 Index("ix_users_uni_email", users.c.uni_email)
@@ -66,9 +67,11 @@ events = Table("events", md, _seq(),
     Column("n", Float),                                # out of
     Column("cur", String(3)),                          # currency for sales rows
     Column("k", String(80)),                           # detail
+    Column("ins", BigInteger),                         # server insert time (epoch ms), used by the rollup
 )
 Index("ix_events_uid_seq", events.c.uid, events.c.seq)
 Index("ix_events_ev_ts", events.c.ev, events.c.ts)
+Index("ix_events_ts", events.c.ts)
 
 news = Table("news", md, _seq(),
     Column("id", String(12), unique=True), Column("created", String(32)), Column("title", String(100)),
@@ -123,6 +126,17 @@ proctor = Table("proctor", md, _seq(),
 settings_t = Table("settings", md,
     Column("key", String(40), primary_key=True), Column("value", Text))
 
+# ---- Running totals, kept up to date by app/rollup.py so dashboards never scan millions of answers ----
+user_stats = Table("user_stats", md,
+    Column("uid", String(40), primary_key=True), Column("last", BigInteger, default=0), Column("q", Integer, default=0),
+    Column("qr", Integer, default=0), Column("mocks", Integer, default=0), Column("best", Float), Column("last_mock", String(20), default=""),
+    Column("last_mock_seq", BigInteger, default=0), Column("lab", Integer, default=0), Column("labr", Integer, default=0))
+Index("ix_user_stats_best", user_stats.c.best)
+topic_stats = Table("topic_stats", md, Column("topic", String(20), primary_key=True), Column("correct", BigInteger, default=0), Column("total", BigInteger, default=0))
+question_stats = Table("question_stats", md, Column("qid", String(20), primary_key=True), Column("correct", BigInteger, default=0), Column("total", BigInteger, default=0))
+day_activity = Table("day_activity", md, Column("uid", String(40), primary_key=True), Column("day", Integer, primary_key=True))
+Index("ix_day_activity_day", day_activity.c.day)
+
 # Rate limits and flood guards, shared by every server instance
 counters = Table("counters", md,
     Column("key", String(120), primary_key=True), Column("n", Integer, nullable=False), Column("exp", BigInteger, nullable=False))
@@ -144,8 +158,16 @@ def make_engine(url=None):
             cur.execute("PRAGMA busy_timeout=30000")
             cur.close()
         return eng
-    return create_engine(url, pool_size=settings.POOL_SIZE, max_overflow=settings.POOL_SIZE,
-                         pool_pre_ping=True, pool_recycle=300)
+    # prepare_threshold=None: Neon's connection pooler (PgBouncer, transaction mode) and server-side
+    # prepared statements don't mix; every query is sent plainly instead.
+    eng = create_engine(url, pool_size=settings.POOL_SIZE, max_overflow=settings.POOL_SIZE, pool_pre_ping=True, pool_recycle=300,
+                        pool_timeout=15, connect_args={"prepare_threshold": None, "connect_timeout": 10})
+
+    @event.listens_for(eng, "begin")
+    def _timeout(conn):
+        # no single request may hold the database for more than 25 s (works through the pooler)
+        conn.exec_driver_sql("SET LOCAL statement_timeout = '25s'")
+    return eng
 
 
 engine = make_engine()
@@ -165,15 +187,44 @@ def init_db(eng=None):
         raise RuntimeError("Could not set up the database: " + _safe(e)) from None
 
 
+UPGRADES = [   # columns and indexes added after the first release; each is safe to run again
+    ("events", "ins", "BIGINT"),
+    ("users", "cday", "INTEGER"),
+]
+
+
+def _upgrade(c, dialect):
+    for table, col, typ in UPGRADES:
+        if dialect == "postgresql":
+            c.exec_driver_sql(f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}')
+        else:
+            cols = [r[1] for r in c.exec_driver_sql(f"PRAGMA table_info({table})")]
+            if col not in cols:
+                c.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+    c.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_events_ts ON events (ts)")
+    if dialect == "postgresql":
+        c.exec_driver_sql("UPDATE users SET cday = floor(extract(epoch from created::timestamptz) / 86400)::int "
+                          "WHERE cday IS NULL AND created <> ''")
+    else:
+        from .util import parse_ms
+        for r in c.exec_driver_sql("SELECT id, created FROM users WHERE cday IS NULL").fetchall():
+            ms = parse_ms(r[1])
+            if ms is not None:
+                c.exec_driver_sql("UPDATE users SET cday = ? WHERE id = ?", (ms // 86_400_000, r[0]))
+
+
 def _init_db(eng):
     if eng.dialect.name == "postgresql":
         with eng.begin() as c:
             c.exec_driver_sql("SELECT pg_advisory_xact_lock(424242)")
             md.create_all(c)
+            _upgrade(c, "postgresql")
         return
     for attempt in range(5):
         try:
             md.create_all(eng)
+            with eng.begin() as c:
+                _upgrade(c, "sqlite")
             return
         except Exception:
             if attempt == 4:
