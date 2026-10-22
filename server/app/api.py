@@ -179,7 +179,7 @@ def packs(c=None):
                 v = json_setting(c, "PACKS", {}) or {}
     except (OSError, ValueError):
         v = {}
-    _packs.update(v=v, at=_t.time())
+    _packs.update(v=v, at=_t.time() if v else _t.time() - 570)   # retry soon if nothing was found yet
     return v
 
 
