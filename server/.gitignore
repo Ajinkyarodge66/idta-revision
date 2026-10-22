@@ -1,0 +1,7 @@
+__pycache__/
+*.db
+*.db-*
+files/
+.pytest_cache/
+packs.json
+.env

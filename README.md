@@ -39,7 +39,7 @@ Students sign up with their **name, country, mobile number (with country code), 
 
 Details are stored in a private Google Sheet run by the group organiser and used only to run the app: logins, progress backup, reset codes, the leaderboard (name, course and scores, only if you opt in) and showing which topics the class finds hard. Passwords are never stored or sent in readable form. You can hide yourself from the leaderboard or **delete your account and all its data** in the Account tab.
 
-Organisers: see [`backend/SETUP.md`](backend/SETUP.md). For your own web address, see [`DOMAIN.md`](DOMAIN.md).
+Organisers: see [`backend/SETUP.md`](backend/SETUP.md) for the original Google Apps Script backend, or [`server/DEPLOY.md`](server/DEPLOY.md) for the faster Python backend (FastAPI + Postgres on Google Cloud Run), which handles far more students at once. For your own web address, see [`DOMAIN.md`](DOMAIN.md).
 
 ## Suggested plan
 

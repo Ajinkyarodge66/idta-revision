@@ -887,6 +887,31 @@ const API = {
     return out;
   },
 
+  /* ----- moving to the Python server: export everything, and keep sending its emails ----- */
+  // Page through one sheet (or 'props') so the new server can copy all data. Admin key only.
+  adminExport: b => admin_(b, () => {
+    if (b.sheet === 'props') {
+      const p = props_(), o = {};
+      ['PRICES', 'EXAM_CFG', 'HIDDEN_Q', 'UNI_DOMAINS', 'NOTIFY_EMAIL'].forEach(k => o[k] = p.getProperty(k));
+      if (!o.NOTIFY_EMAIL) try { o.NOTIFY_EMAIL = Session.getEffectiveUser().getEmail(); } catch (e) {}
+      o.PEPPER = pepper_();   // needed so existing passwords keep working on the new server
+      o.PACKS = JSON.stringify(packs_());   // private university packs (kept private: only readable with the admin key)
+      return { ok: true, props: o };
+    }
+    if (!SHEETS[b.sheet]) return fail_('bad_sheet');
+    const v = sheet_(b.sheet).getDataRange().getValues(), off = Math.max(0, Math.floor(Number(b.offset) || 0)), lim = Math.max(1, Math.min(2000, Math.floor(Number(b.limit) || 500)));
+    return { ok: true, cols: SHEETS[b.sheet].cols, total: Math.max(0, v.length - 1), rows: v.slice(1 + off, 1 + off + lim) };
+  }),
+  // The Python server sends its emails (reset codes, payment alerts) through here, so no new email account is needed.
+  relayMail: b => {
+    const key = props_().getProperty('ADMIN_KEY');
+    if (!key || String(b.key || '') !== key) return fail_('bad_key');
+    const to = email_(b.to), subject = plain_(b.subject, 200), body = String(b.body || '').slice(0, 5000);
+    if (!to || !subject) return fail_('bad_mail');
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+    return { ok: true, left: MailApp.getRemainingDailyQuota() };
+  },
+
   admin: b => {
     const key = props_().getProperty('ADMIN_KEY');
     if (!key || String(b.key || '') !== key) return fail_('bad_key');

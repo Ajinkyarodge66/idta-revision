@@ -366,6 +366,7 @@ body.certmode nav.tabs,body.certmode .bottomnav,body.certmode #share-btn,body.ce
 .pay-wait b{display:block}.pay-wait span{color:var(--muted);font-size:.92rem}
 .pay-spin{flex:none;width:20px;height:20px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin-top:.15rem}
 @media (prefers-reduced-motion:no-preference){.pay-spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}}
+.pay-flag{flex-basis:100%;background:var(--warn-bg,#fff4e5);color:inherit;border-left:3px solid #d97706;border-radius:6px;padding:.45rem .6rem;font-size:.85rem;margin:0}
 .pay-item{display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:.8rem .9rem;margin-bottom:.7rem}
 .pay-main{min-width:0;flex:1 1 16rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-start}
 .pay-main>span{color:var(--muted);font-size:.9rem}
@@ -1233,7 +1234,7 @@ const payFormHTML=last=>`${last&&last.status==="rejected"?`<div class="feedback 
   <b>Paid? Upload your payment screenshot</b><p class="hint" style="margin:.2rem 0 .7rem">Take a screenshot of the successful payment in your UPI or bank app. The organiser checks it, usually within minutes, and the exams unlock here automatically.</p>
   <form id="f-pay" novalidate><label class="file-drop" for="pay-file"><input type="file" id="pay-file" accept="image/png,image/jpeg,image/webp"><span class="fd-ic" aria-hidden="true">📷</span><span id="pay-fname">Choose screenshot</span></label>
   <img id="pay-prev" class="pay-prev" alt="Preview of your payment screenshot" hidden>
-  <div class="field" style="margin-top:.7rem"><label for="pay-ref">Transaction ID / UTR (optional)</label><input id="pay-ref" maxlength="60" autocomplete="off" placeholder="e.g. 4123 5678 9012"></div>
+  <div class="field" style="margin-top:.7rem"><label for="pay-ref">Transaction ID / UTR</label><input id="pay-ref" maxlength="60" autocomplete="off" required aria-describedby="pay-ref-hint" placeholder="e.g. 4123 5678 9012"><span class="hint" id="pay-ref-hint" style="display:block;margin-top:.25rem">The 12-digit UTR in your UPI app, or the reference from your bank or Wise. Each reference can only be used once.</span></div>
   <label class="check" style="margin:.2rem 0 .6rem"><input type="checkbox" id="pay-agree"><span>I agree to the refund policy: I can cancel for a full refund until I start my first course exam. After I start an exam, the payment is non-refundable.</span></label>
   <div id="pay-msg" role="status"></div><button class="btn primary" type="submit">Send for approval</button></form>`;
 const payPendingHTML=pm=>`<div class="pay-wait"><span class="pay-spin" aria-hidden="true"></span><div><b>Screenshot received. Waiting for approval.</b><span>Sent ${ago(new Date(pm.submitted).getTime())}. The organiser usually checks within minutes. Keep this page open, or come back later; it unlocks automatically.</span></div></div>`;
@@ -1254,7 +1255,7 @@ function bindPayForm(){
   $("#pay-file").onchange=async e=>{const file=e.target.files[0];picked=null;$("#pay-msg").innerHTML="";if(!file)return;
     if(!/^image\//.test(file.type))return msg(false,"Choose an image file (a screenshot).");
     try{picked=await shrinkImage(file);$("#pay-fname").textContent=file.name;const pv=$("#pay-prev");pv.src=picked.preview;pv.hidden=false}catch(err){msg(false,"That image couldn't be opened. Try another screenshot.")}};
-  f.onsubmit=async e=>{e.preventDefault();if(!picked)return msg(false,"Choose your payment screenshot first.");if(!$("#pay-agree").checked)return msg(false,"Tick the box to agree to the refund policy.");
+  f.onsubmit=async e=>{e.preventDefault();if(!picked)return msg(false,"Choose your payment screenshot first.");if($("#pay-ref").value.replace(/[^A-Za-z0-9]/g,"").length<6)return msg(false,errMsg("bad_ref"));if(!$("#pay-agree").checked)return msg(false,"Tick the box to agree to the refund policy.");
     await busy(f.querySelector("button[type=submit]"),"Uploading…",async()=>{
       const r=await api("paySubmit",{token:AUTH.token(),mime:picked.mime,image:picked.data,ref:$("#pay-ref").value.trim()});
       if(!r.ok)return msg(false,errMsg(r.error));
@@ -1655,7 +1656,11 @@ const ERR = {
   already_unlocked:"Your exams are already unlocked. Refresh the page.",
   no_payment:"That payment no longer exists. Refresh the page.",
   already_decided:"That payment was already approved or rejected. Refresh the page.",
-  no_image:"The screenshot file couldn't be found in Google Drive.",
+  no_image:"The screenshot file couldn't be found.",
+  bad_ref:"Enter the transaction ID / UTR from your payment app (at least 6 letters or digits).",
+  duplicate_payment:"This payment has already been used to unlock another account. If this is a mistake, contact the organiser.",
+  too_big:"That file is too large. Choose a smaller screenshot.",
+  busy:"The server is busy. Please try again in a moment.",
   no_cert:"Certificate not found.",
   coupon_expired:"That code has expired. Ask for a new one.",
   coupon_used_up:"That code has already been used the maximum number of times.",
@@ -2230,11 +2235,12 @@ function salesHTML(sl) {
 function payQueueHTML(pm) {
   const when = s => { const t = new Date(s).getTime(); return isNaN(t) ? "" : ago(t); };
   return `<div class="card pay-q" style="margin-bottom:1rem"><h2>Payments to check ${pm.pending.length ? `<span class="badge warn">${pm.pending.length} waiting</span>` : ""}</h2>
-  ${pm.pending.length ? pm.pending.map(p => `<div class="pay-item" data-pid="${esc(p.id)}"><div class="pay-main"><b>${esc(p.name)}</b><span>${esc(p.mobile)} · ${when(p.submitted)}${p.ref ? ` · ref <code>${esc(p.ref)}</code>` : ""}</span>
-    <button class="btn small" data-pview="${esc(p.id)}">View screenshot</button><div class="pay-img" id="img-${esc(p.id)}"></div></div>
+  ${pm.pending.length ? pm.pending.map(p => `<div class="pay-item" data-pid="${esc(p.id)}"><div class="pay-main"><b>${esc(p.name)}</b><span>${esc(p.mobile)} · ${when(p.submitted)}${p.ref ? ` · ref <code>${esc(p.ref)}</code>` : " · <b>no reference</b>"}</span>
+    ${(p.flags || []).length ? `<p class="pay-flag">⚠️ ${p.flags.map(esc).join("<br>⚠️ ")}</p>` : ""}<button class="btn small" data-pview="${esc(p.id)}">View screenshot</button><div class="pay-img" id="img-${esc(p.id)}"></div></div>
     <div class="pay-act"><label class="sr-only" for="amt-${esc(p.id)}">Amount</label><span class="amt">${esc(p.cur || "GBP")} <input id="amt-${esc(p.id)}" type="number" min="0" step="0.01" value="${p.amount}"></span><button class="btn primary small" data-appr="${esc(p.id)}">Approve &amp; unlock</button>
     <input id="why-${esc(p.id)}" class="why" maxlength="120" placeholder="Reason if rejecting (optional)"><button class="btn small" data-rej="${esc(p.id)}">Reject</button></div></div>`).join("")
     : `<p class="hint">Nothing waiting. New screenshots appear here automatically, and you also get an email.</p>`}
+  ${pm.pending.length ? `<p class="hint" style="margin:.2rem 0 0">Before approving, find the reference in your UPI or bank app and check the amount arrived. A reference that already unlocked another account is refused automatically.</p>` : ""}
   ${pm.recent.length ? `<details class="pay-recent"><summary>Recent decisions (${pm.recent.length})</summary><div class="tbl"><table><tr><th>Student</th><th>Amount</th><th>Ref</th><th>Result</th><th>When</th></tr>${pm.recent.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${fmtCur(p.amount, p.cur)}</td><td>${esc(p.ref || "–")}</td><td>${p.status === "approved" ? `<span class="badge ok">Approved</span>` : `<span class="badge warn">Rejected</span>${p.note ? " " + esc(p.note) : ""}`}</td><td>${when(p.decided)}</td></tr>`).join("")}</table></div></details>` : ""}</div>`;
 }
 function payTabBadge(n) { n += AD.other || 0; const b = document.querySelector('#admin-root [data-t="exam"]'); if (b) b.innerHTML = "Exam &amp; coupons" + (n ? ` <span class="tab-dot">${n}</span>` : ""); }
