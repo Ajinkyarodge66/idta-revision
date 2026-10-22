@@ -1,4 +1,6 @@
 """Database tables. Postgres in production, SQLite for local runs and tests."""
+import re
+
 from sqlalchemy import (BigInteger, Boolean, Column, Float, Index, Integer, MetaData, String, Table, Text,
                         create_engine, event)
 from . import settings
@@ -149,9 +151,21 @@ def make_engine(url=None):
 engine = make_engine()
 
 
+def _safe(e):
+    """Error text without passwords (database errors can echo the connection string)."""
+    return re.sub(r"(postgres(?:ql)?(?:\+\w+)?://[^:/@\s]+):[^@\s]+@", r"\1:***@", re.sub(r"npg_\w+", "npg_***", str(e)))[:600]
+
+
 def init_db(eng=None):
     """Create missing tables. Several server processes start at once, so only one does it at a time."""
     eng = eng or engine
+    try:
+        _init_db(eng)
+    except Exception as e:
+        raise RuntimeError("Could not set up the database: " + _safe(e)) from None
+
+
+def _init_db(eng):
     if eng.dialect.name == "postgresql":
         with eng.begin() as c:
             c.exec_driver_sql("SELECT pg_advisory_xact_lock(424242)")

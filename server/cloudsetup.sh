@@ -10,17 +10,25 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregi
 echo "== 2/5 Private bucket for screenshots and exam photos"
 gcloud storage buckets describe gs://$BUCKET >/dev/null 2>&1 || gcloud storage buckets create gs://$BUCKET --location=$REGION --uniform-bucket-level-access --public-access-prevention
 echo "== 3/5 Secrets (what you paste is hidden and never shown)"
-secret() {  # name, prompt
+ask() {  # prompt, check-regex: keeps asking until the paste looks right
+  while true; do
+    read -r -s -p "   $1: " V; echo
+    V=$(printf %s "$V" | tr -d '\r' | sed -e "s/^[[:space:]'\"]*//" -e "s/[[:space:]'\"]*$//" -e 's/^psql //')
+    if [[ "$V" =~ $2 ]] && [ "$(grep -o '://' <<<"$V" | wc -l)" -le 1 ]; then return 0; fi
+    echo "   That doesn't look right (pasted twice, or extra text?). Copy it again and paste only once."
+  done
+}
+secret() {  # name, prompt, check-regex
   if gcloud secrets describe "$1" >/dev/null 2>&1; then
     read -r -p "   $1 already saved. Replace it? [y/N] " a; [ "$a" = "y" ] || return 0
-    read -r -s -p "   $2: " V; echo; printf %s "$V" | gcloud secrets versions add "$1" --data-file=- >/dev/null
+    ask "$2" "$3"; printf %s "$V" | gcloud secrets versions add "$1" --data-file=- >/dev/null
   else
-    read -r -s -p "   $2: " V; echo; printf %s "$V" | gcloud secrets create "$1" --data-file=- >/dev/null
+    ask "$2" "$3"; printf %s "$V" | gcloud secrets create "$1" --data-file=- >/dev/null
   fi
   unset V; echo "   saved $1"
 }
-secret db-url "Paste the Neon connection string (postgresql://...), then press Enter"
-secret admin-key "Paste your admin key, then press Enter"
+secret db-url "Paste the Neon connection string (postgresql://...), then press Enter" '^postgres(ql)?://[^[:space:]]+@[^[:space:]]+/[^[:space:]]+$'
+secret admin-key "Paste your admin key, then press Enter" '^[^[:space:]]{4,}$'
 SA=$(gcloud projects describe $PROJECT --format='value(projectNumber)')-compute@developer.gserviceaccount.com
 for s in admin-key db-url; do gcloud secrets add-iam-policy-binding $s --member=serviceAccount:$SA --role=roles/secretmanager.secretAccessor -q >/dev/null; done
 gcloud storage buckets add-iam-policy-binding gs://$BUCKET --member=serviceAccount:$SA --role=roles/storage.objectAdmin -q >/dev/null

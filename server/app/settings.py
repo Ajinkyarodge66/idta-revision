@@ -6,7 +6,7 @@ def _env(name, default=""):
     return os.environ.get(name, default).strip()
 
 
-DATABASE_URL = _env("DATABASE_URL", "sqlite:///./idta-dev.db")
+DATABASE_URL = _env("DATABASE_URL", "sqlite:///./idta-dev.db").strip().strip("'\"")
 ADMIN_KEY = _env("ADMIN_KEY")                 # same key you type into the Admin tab
 PEPPER = _env("PEPPER")                       # optional; otherwise kept in the database (migrated from Apps Script)
 PACKS_FILE = _env("PACKS_FILE")               # private university packs (packs.json), mounted as a secret; never in git
