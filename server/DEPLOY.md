@@ -80,7 +80,7 @@ cd ~/idta-revision && git pull -q && bash server/clouddeploy.sh
   `question_stats`, `day_activity`), which `app/rollup.py` keeps up to date in the background. They don't scan every answer ever given.
 - **Bounded responses.** The leaderboard returns the top 300, plus your own row. The admin page lists the 1,000 most recently
   active students and searches the rest on the server. The export downloads everyone page by page.
-- **Automatic scaling.** Cloud Run runs up to 100 server copies of 80 requests each, and Neon's connection pooler shares database connections.
+- **Automatic scaling.** Cloud Run runs up to 20 server copies of 80 requests each (new Google accounts are capped at 20 in London; request a quota increase, then run `MAX_INSTANCES=100 bash server/clouddeploy.sh`), and Neon's connection pooler shares database connections.
 - **Safety limits.** There's a 25-second limit per query, a flood guard per IP (generous enough for a whole campus on one network),
   4 MB request size, gzip responses, and retries on brief database hiccups.
 - **What to upgrade as you grow:** Neon storage and compute past roughly 10,000 active students, and email through Brevo or Resend
