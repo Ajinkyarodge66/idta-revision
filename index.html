@@ -1006,19 +1006,19 @@ document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("clic
 
 /* ================= practice ================= */
 const P={topic:"all",list:[],i:0,it:null,checked:false,right:0,done:0};
-const SPECIAL={all:"All topics",due:"🔁 Due for review",sample:"★ Official sample paper",pack:"🔒 Module pack",miss:"My mistakes"};
+const SPECIAL={all:"All topics",due:"🔁 Due for review",sample:"★ Official sample paper",theory:"🎯 Exam style (theory only)",pack:"🔒 Module pack",miss:"My mistakes"};
 function buildFilters(el,current,onPick,counts,extra){
   const keys=[...(extra||["all"]),...Object.keys(TOPICS)];
-  el.innerHTML=keys.filter(k=>!((k==="sample"||k==="pack"||k==="py"||k==="due")&&!counts(k))).map(k=>`<button aria-pressed="${k===current}" data-k="${k}">${esc(SPECIAL[k]||TOPICS[k])} <span class="mono">${counts(k)}</span></button>`).join("");
+  el.innerHTML=keys.filter(k=>!((k==="sample"||k==="pack"||k==="theory"||k==="py"||k==="due")&&!counts(k))).map(k=>`<button aria-pressed="${k===current}" data-k="${k}">${esc(SPECIAL[k]||TOPICS[k])} <span class="mono">${counts(k)}</span></button>`).join("");
   el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>onPick(b.dataset.k)));
 }
 const getMiss=()=>new Set(store.get("idta-miss",[]));
 const markMiss=(id,wrong)=>{const m=getMiss();wrong?m.add(id):m.delete(id);store.set("idta-miss",[...m])};
 const topicLabel=k=>SPECIAL[k]||TOPICS[k]||(String(k).startsWith("pack:")?"🔒 "+(TOPICS[k.slice(5)]||k.slice(5)):String(k));
-const pPool=k=>String(k).startsWith("pack:")?Q.filter(q=>q&&q.pack&&q.t===k.slice(5)):k==="all"?Q.filter(Boolean):k==="sample"?Q.filter(q=>q&&q.s):k==="pack"?Q.filter(q=>q&&q.pack):k==="miss"?Q.filter(q=>getMiss().has(q.id)):k==="due"?(()=>{const d=new Set(dueIds());return Q.filter(q=>q&&d.has(String(q.id)))})():Q.filter(q=>q.t===k);
+const pPool=k=>String(k).startsWith("pack:")?Q.filter(q=>q&&q.pack&&q.t===k.slice(5)):k==="all"?Q.filter(Boolean):k==="sample"?Q.filter(q=>q&&q.s):k==="theory"?(hasPackExam()?Q.filter(q=>q&&q.pack&&!isCalc(q)):[]):k==="pack"?Q.filter(q=>q&&q.pack):k==="miss"?Q.filter(q=>getMiss().has(q.id)):k==="due"?(()=>{const d=new Set(dueIds());return Q.filter(q=>q&&d.has(String(q.id)))})():Q.filter(q=>q.t===k);
 function pStart(topic){
   P.topic=topic; P.list=shuffle(pPool(topic)); P.i=0; P.right=0; P.done=0;
-  buildFilters($("#p-filters"),topic,pStart,k=>pPool(k).length,["all","due","sample","pack","miss"]);
+  buildFilters($("#p-filters"),topic,pStart,k=>pPool(k).length,["all","due","sample","theory","pack","miss"]);
   pShow();
 }
 function pShow(){
@@ -1125,12 +1125,36 @@ function bindCoach(root){
   animateRings(root);
 }
 
+/* ================= theory-only exams ================= */
+/* Questions that need a calculation, stored as fingerprints of their wording (so the private module questions aren't
+   exposed). The University of Portsmouth exam is theory only, so its mock and "Exam style" practice leave these out. */
+const CALC_FP=new Set(["104ftew", "10pmvvo", "10rjd6p", "113q6eg", "1147lhk", "129z6tx", "12weclj", "131e8kg", "13nawns", "142ymcl", "14x7tps", "15vrg7v", "16esn8m", "17b0244", "188d0ab", "19nrac8", "1b3srlg", "1d034ez", "1drufow", "1fok2qd", "1fwosl8", "1g5ycc4", "1gxnkcy", "1idxqh", "1imfxvy", "1izmay8", "1k2kcdu", "1kmfm6b", "1l499eb", "1ld5e75", "1mvgebh", "1p4xfcd", "1sbymcq", "1ujij2q", "1unnww3", "1w2sih6", "1xcq1ji", "1xq68du", "1xy5v5f", "1yfy27f", "45qykm", "53ce2q", "dfjmwv", "edf5eh", "g1gnkt", "iar8on", "jkjes5", "jp7zpk", "knxux3", "kreg3f", "kwmjt3", "nfn1o7", "nvpw2l", "oer4c8", "p8hrzu", "q8aupv", "rhxlgc", "thznvp", "typ3kf", "vmog15", "wbtnqe", "xkf4dx", "xw06dq"]);
+const fpOf=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(36)};
+const isCalc=q=>!!q&&(!!q.calc||CALC_FP.has(fpOf(q.p||"")));
+function packExamInfo(){if(!hasPackExam())return null;const e=PACK.exam;return e.theory===false?e:{...e,
+  format:"Closed book · theory only, no calculations · MCQ, multiple response, matching",
+  desc:"Mirrors the real University of Portsmouth IDTA Part 1 computer-based exam: 30 theory questions across every topic (no calculations), mixing single answer, multiple response and matching like the official sample paper. 60 minutes, closed book, and no feedback until you submit."}}
+
 /* ================= mock exam ================= */
 const MK={state:"intro",items:[],i:0,end:0,timer:null,flags:new Set(),confirm:false,n:30,mins:60};
 function pickMock(n){
   // Round-robin across the 10 exam topics so every area appears, like the real paper
   const CORE=["data","dist","prep","cls","eval","nn","ens","reg","arm","clu"];
   const topics=(MK.mode==="pack"&&typeof PACK!=="undefined"&&PACK&&PACK.exam)?((PACK.exam.topics||CORE).filter(t=>TOPICS[t])):Object.keys(TOPICS).filter(t=>t!=="py");
+  if(MK.mode==="pack"&&hasPackExam()&&PACK.exam.theory!==false){
+    // Like the official sample paper: theory only, about 20% matching, 17% multiple response, the rest single answer,
+    // spread across every topic.
+    const ok=q=>q&&topics.includes(q.t)&&!q.pro&&!isCalc(q);
+    const quota={match:Math.round(n*.2),multi:Math.round(n*.17)};quota.single=n-quota.match-quota.multi;
+    const out=[],used=new Set();
+    ["match","multi","single"].forEach(type=>{
+      const byT={};topics.forEach(t=>byT[t]=shuffle(Q.filter(q=>ok(q)&&q.type===type&&q.t===t)));
+      const order=shuffle(topics);let c=0,k=0;
+      while(c<quota[type]&&order.some(t=>byT[t].length)){const q=byT[order[k%order.length]].pop();if(q&&!used.has(q.id)){out.push(q);used.add(q.id);c++}k++}
+    });
+    if(out.length<n){const rest=shuffle(Q.filter(q=>ok(q)&&!used.has(q.id)));while(out.length<n&&rest.length)out.push(rest.pop())}
+    return shuffle(out).map(instance);
+  }
   const byT={};topics.forEach(t=>byT[t]=shuffle(Q.filter(q=>q.t===t&&!q.pro)));
   const order=shuffle(topics);
   const out=[];let k=0;
@@ -1138,7 +1162,7 @@ function pickMock(n){
   return shuffle(out).map(instance);
 }
 function hasPackExam(){return typeof PACK!=="undefined"&&!!PACK&&!!PACK.exam}
-function EX(m){m=m||MK.mode||(hasPackExam()?"pack":"course");const e=(m==="pack"&&hasPackExam())?PACK.exam:null;return e?{title:e.title||"Module mock exam",desc:e.desc||"",n:e.n||30,minutes:e.minutes||60}:{title:"AI & ML course exams",desc:"Choose a random exam, one of three fixed papers, or a 10-question topic test. There's no feedback until you submit, just like a real computer-based exam. Pass a full exam with 70% or more to earn a certificate.",n:30,minutes:60}}
+function EX(m){m=m||MK.mode||(hasPackExam()?"pack":"course");const e=(m==="pack"&&hasPackExam())?packExamInfo():null;return e?{title:e.title||"Module mock exam",desc:e.desc||"",n:e.n||30,minutes:e.minutes||60}:{title:"AI & ML course exams",desc:"Choose a random exam, one of three fixed papers, or a 10-question topic test. There's no feedback until you submit, just like a real computer-based exam. Pass a full exam with 70% or more to earn a certificate.",n:30,minutes:60}}
 const examCfg=()=>{try{return (CONFIG&&CONFIG.exam)||null}catch(e){return null}};
 function examLocked(){try{const c=examCfg();if(!SYNC_URL||!c||!c.lock)return false;const a=AUTH.get();return !(a&&a.profile&&a.profile.examAccess)}catch(e){return false}}
 const PAPERS=3;
@@ -3291,7 +3315,7 @@ const SYLLABUS = [
   { title:"Python & labs", covers:"Jupyter/Colab · pandas · scikit-learn · Keras lab code", t:["py"] }
 ];
 function uniPackRender() {
-  const root = $("#uni-root"), p = uniProfile(), ex = PACK.exam;
+  const root = $("#uni-root"), p = uniProfile(), ex = packExamInfo();
   const sample = Q.filter(q => q && q.s).length, mod = Q.filter(q => q && q.pack).length;
   root.innerHTML = `<div class="uni-head"><div><div class="label"><span class="badge ok">✓ Verified</span> ${esc(PACK.uni)} · private pack</div><h1>${esc(PACK.title || PACK.uni)}</h1></div></div>
   <div class="tiles">
@@ -3303,7 +3327,12 @@ function uniPackRender() {
     <div class="syl-list">${SYLLABUS.map((w, i) => { const n = w.t.reduce((a, t) => a + Q.filter(q => q && q.pack && q.t === t && !q.s).length, 0); return n ? `<div class="syl-row"><span class="syl-n">${i + 1}</span><div class="syl-main"><b>${esc(w.title)}</b><span class="hint">${esc(w.covers)}</span></div><div class="syl-btns">${w.t.map(t => { const c = Q.filter(q => q && q.pack && q.t === t && !q.s).length; return c ? `<button class="btn small" data-syl="${t}">${esc(TOPICS[t] || t)} · ${c}</button>` : ""; }).join("")}</div></div>` : ""; }).join("")}</div></div>
   <div id="uni-notes"></div>`;
   root.querySelectorAll("[data-syl]").forEach(b => b.onclick = () => { show("practice"); pStart("pack:" + b.dataset.syl); });
-  if (PACK.notes) { $("#uni-notes").innerHTML = PACK.notes; initNoteSearch(); }
+  if (PACK.notes) {
+    let notes = PACK.notes;
+    if (packExamInfo() && PACK.exam.theory !== false)   // the exam is now theory only: swap the old calculation tip
+      notes = notes.replace(/<li><b>Calculations:<\/b>[\s\S]*?<\/li>/, `<li><b>Theory only:</b> the exam has no calculation questions. Know what each formula and metric <i>means</i> and when to use it (what a high lift, RMSE or recall tells you), but you won't need to work out numbers.</li>`);
+    $("#uni-notes").innerHTML = notes; initNoteSearch();
+  }
   if ($("#uv-mock")) $("#uv-mock").onclick = () => { MK.mode = "pack"; MK.chosen = true; show("mock"); startMock(ex.n, ex.minutes); };
   if ($("#uv-sample")) $("#uv-sample").onclick = () => { show("practice"); pStart("sample"); };
   $("#uv-all").onclick = () => { show("practice"); pStart("pack"); };
