@@ -1006,7 +1006,7 @@ document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("clic
 
 /* ================= practice ================= */
 const P={topic:"all",list:[],i:0,it:null,checked:false,right:0,done:0};
-const SPECIAL={all:"All topics",due:"🔁 Due for review",sample:"★ Official sample paper",theory:"🎯 Exam style (theory only)",pack:"🔒 Module pack (theory only)",miss:"My mistakes"};
+const SPECIAL={all:"All topics",due:"🔁 Due for review",sample:"★ Official sample paper",theory:"🎯 Exam style (theory only)",pack:"🔒 Module pack (exam style)",miss:"My mistakes"};
 function buildFilters(el,current,onPick,counts,extra){
   const keys=[...(extra||["all"]),...Object.keys(TOPICS)];
   el.innerHTML=keys.filter(k=>!((k==="sample"||k==="pack"||k==="theory"||k==="py"||k==="due")&&!counts(k))).map(k=>`<button aria-pressed="${k===current}" data-k="${k}">${esc(SPECIAL[k]||TOPICS[k])} <span class="mono">${counts(k)}</span></button>`).join("");
@@ -1128,12 +1128,13 @@ function bindCoach(root){
 /* ================= theory-only exams ================= */
 /* Questions that need a calculation, stored as fingerprints of their wording (so the private module questions aren't
    exposed). The University of Portsmouth exam is theory only, so its mock and "Exam style" practice leave these out. */
-const CALC_FP=new Set(["104ftew", "10pmvvo", "10rjd6p", "113q6eg", "1147lhk", "129z6tx", "12weclj", "131e8kg", "13nawns", "142ymcl", "14x7tps", "15vrg7v", "16esn8m", "17b0244", "188d0ab", "19nrac8", "1b3srlg", "1d034ez", "1drufow", "1fok2qd", "1fwosl8", "1g5ycc4", "1gxnkcy", "1idxqh", "1imfxvy", "1izmay8", "1k2kcdu", "1kmfm6b", "1l499eb", "1ld5e75", "1mvgebh", "1p4xfcd", "1sbymcq", "1ujij2q", "1unnww3", "1w2sih6", "1xcq1ji", "1xq68du", "1xy5v5f", "1yfy27f", "45qykm", "53ce2q", "dfjmwv", "edf5eh", "g1gnkt", "iar8on", "jkjes5", "jp7zpk", "knxux3", "kreg3f", "kwmjt3", "nfn1o7", "nvpw2l", "oer4c8", "p8hrzu", "q8aupv", "rhxlgc", "thznvp", "typ3kf", "vmog15", "wbtnqe", "xkf4dx", "xw06dq"]);
+// Exception: the official sample paper includes a rule-confidence calculation (Q22), so that kind stays in.
+const CALC_FP=new Set(["104ftew", "10pmvvo", "10rjd6p", "113q6eg", "1147lhk", "129z6tx", "12weclj", "131e8kg", "13nawns", "142ymcl", "15vrg7v", "16esn8m", "17b0244", "188d0ab", "19nrac8", "1b3srlg", "1d034ez", "1fok2qd", "1fwosl8", "1g5ycc4", "1gxnkcy", "1imfxvy", "1izmay8", "1k2kcdu", "1kmfm6b", "1l499eb", "1ld5e75", "1mvgebh", "1p4xfcd", "1sbymcq", "1ujij2q", "1unnww3", "1w2sih6", "1xcq1ji", "1xy5v5f", "1yfy27f", "45qykm", "53ce2q", "dfjmwv", "edf5eh", "g1gnkt", "iar8on", "jkjes5", "jp7zpk", "knxux3", "kreg3f", "kwmjt3", "nfn1o7", "nvpw2l", "oer4c8", "p8hrzu", "q8aupv", "rhxlgc", "thznvp", "typ3kf", "vmog15", "wbtnqe", "xkf4dx", "xw06dq"]);
 const fpOf=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(36)};
 const isCalc=q=>!!q&&(!!q.calc||CALC_FP.has(fpOf(q.p||"")));
 function packExamInfo(){if(!hasPackExam())return null;const e=PACK.exam;return e.theory===false?e:{...e,
-  format:"Closed book · theory only, no calculations · MCQ, multiple response, matching",
-  desc:"Mirrors the real University of Portsmouth IDTA Part 1 computer-based exam: 30 theory questions across every topic (no calculations), mixing single answer, multiple response and matching like the official sample paper. 60 minutes, closed book, and no feedback until you submit."}}
+  format:"Closed book · no calculator · theory, like the sample paper · MCQ, multiple response, matching",
+  desc:"Mirrors the real University of Portsmouth IDTA Part 1 computer-based exam: 30 questions across every topic, written like the official sample paper. They're theory questions, and the only calculation kind is the one the sample paper includes (a quick rule confidence, e.g. 30% ÷ 50%). Single answer, multiple response and matching, 60 minutes, closed book, and no feedback until you submit."}}
 
 /* ================= mock exam ================= */
 const MK={state:"intro",items:[],i:0,end:0,timer:null,flags:new Set(),confirm:false,n:30,mins:60};
@@ -3332,7 +3333,7 @@ function uniPackRender() {
   if (PACK.notes) {
     let notes = PACK.notes;
     if (packExamInfo() && PACK.exam.theory !== false)   // the exam is now theory only: swap the old calculation tip
-      notes = notes.replace(/<li><b>Calculations:<\/b>[\s\S]*?<\/li>/, `<li><b>Theory only:</b> the exam has no calculation questions. Know what each formula and metric <i>means</i> and when to use it (what a high lift, RMSE or recall tells you), but you won't need to work out numbers.</li>`);
+      notes = notes.replace(/<li><b>Calculations:<\/b>[\s\S]*?<\/li>/, `<li><b>Mostly theory:</b> know what each formula and metric <i>means</i> and when to use it (what a high lift, RMSE or recall tells you). The only calculation in the sample paper is a quick rule confidence (support of both ÷ support of the left side, e.g. 30% ÷ 50% = 60%), so practise that one.</li>`);
     $("#uni-notes").innerHTML = notes; initNoteSearch();
   }
   if ($("#uv-mock")) $("#uv-mock").onclick = () => { MK.mode = "pack"; MK.chosen = true; show("mock"); startMock(ex.n, ex.minutes); };
