@@ -1131,7 +1131,8 @@ function bindCoach(root){
 // Exception: the official sample paper includes a rule-confidence calculation (Q22), so that kind stays in.
 const CALC_FP=new Set(["104ftew", "10pmvvo", "10rjd6p", "113q6eg", "1147lhk", "129z6tx", "12weclj", "131e8kg", "13nawns", "142ymcl", "15vrg7v", "16esn8m", "17b0244", "188d0ab", "19nrac8", "1b3srlg", "1d034ez", "1fok2qd", "1fwosl8", "1g5ycc4", "1gxnkcy", "1imfxvy", "1izmay8", "1k2kcdu", "1kmfm6b", "1l499eb", "1ld5e75", "1mvgebh", "1p4xfcd", "1sbymcq", "1ujij2q", "1unnww3", "1w2sih6", "1xcq1ji", "1xy5v5f", "1yfy27f", "45qykm", "53ce2q", "dfjmwv", "edf5eh", "g1gnkt", "iar8on", "jkjes5", "jp7zpk", "knxux3", "kreg3f", "kwmjt3", "nfn1o7", "nvpw2l", "oer4c8", "p8hrzu", "q8aupv", "rhxlgc", "thznvp", "typ3kf", "vmog15", "wbtnqe", "xkf4dx", "xw06dq"]);
 const fpOf=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(36)};
-const isCalc=q=>!!q&&(!!q.calc||CALC_FP.has(fpOf(q.p||"")));
+// Official sample-paper questions are never hidden, whatever they contain.
+const isCalc=q=>!!q&&!q.s&&(!!q.calc||CALC_FP.has(fpOf(q.p||"")));
 function packExamInfo(){if(!hasPackExam())return null;const e=PACK.exam;return e.theory===false?e:{...e,
   format:"Closed book · no calculator · theory, like the sample paper · MCQ, multiple response, matching",
   desc:"Mirrors the real University of Portsmouth IDTA Part 1 computer-based exam: 30 questions across every topic, written like the official sample paper. They're theory questions, and the only calculation kind is the one the sample paper includes (a quick rule confidence, e.g. 30% ÷ 50%). Single answer, multiple response and matching, 60 minutes, closed book, and no feedback until you submit."}}
